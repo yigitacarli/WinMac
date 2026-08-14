@@ -10,8 +10,8 @@ public struct SettingsView: View {
     
     public enum SettingsTab: String, CaseIterable, Identifiable {
         case alttab = "Alt + Tab"
-        case snap = "Pencere Yaslama (Rectangle)"
-        case mouse = "Linear Mouse & Kaydırma"
+        case snap = "Pencere Yaslama (Rectangle Pro)"
+        case mouse = "Linear Mouse Pro"
         case keyboard = "Klavye"
         case finder = "Finder"
         case clipboard = "Pano (Win + V)"
@@ -65,7 +65,7 @@ public struct SettingsView: View {
                 }
             }
             .listStyle(SidebarListStyle())
-            .frame(minWidth: 230)
+            .frame(minWidth: 240)
         } detail: {
             ScrollView(.vertical, showsIndicators: true) {
                 VStack(alignment: .leading, spacing: 20) {
@@ -90,7 +90,7 @@ public struct SettingsView: View {
                 .frame(maxWidth: .infinity, alignment: .topLeading)
             }
         }
-        .frame(width: 780, height: 560)
+        .frame(width: 820, height: 600)
     }
 }
 
@@ -106,7 +106,7 @@ private struct AltTabSettingsSection: View {
             SettingsCard {
                 ToggleRow(
                     title: "Alt + Tab'ı Etkinleştir",
-                    subtitle: "Option + Tab veya Cmd + Tab ile pencereler arasında geçiş yapın.",
+                    subtitle: "Option + Tab ile pencereler arasında geçiş yapın.",
                     isOn: $settings.altTabEnabled
                 )
                 
@@ -154,14 +154,44 @@ private struct SnapSettingsSection: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
-            HeaderTitle(title: "Pencere Yaslama (Rectangle Güç Paketi)", subtitle: "Ekranı 1/2, 1/3, 1/4 veya tam ekran boyutlarına anında bölen kısayollar.")
+            HeaderTitle(title: "Pencere Yaslama (Rectangle Pro)", subtitle: "Ekran kenarlarına sürükleme önizlemesi ve tekrarlayan kısayol döngüleri.")
             
             SettingsCard {
                 ToggleRow(
+                    title: "Kenarlara Sürükleyerek Yaslama (Drag-to-Snap)",
+                    subtitle: "Pencereyi ekran kenarına/köşesine sürükleyince mavi önizleme belirir ve bırakınca yaslanır.",
+                    isOn: $settings.dragToSnapEnabled
+                )
+                
+                Divider()
+                
+                ToggleRow(
+                    title: "Tekrarlayan Kısayol Döngüsü (Cycle Thirds)",
+                    subtitle: "Aynı kısayola art arda basınca pencere 1/2 -> 2/3 -> 1/3 oranları arasında döner.",
+                    isOn: $settings.cycleRepeatedShortcuts
+                )
+                
+                Divider()
+                
+                ToggleRow(
                     title: "Pencere Yaslama Kısayollarını Etkinleştir",
-                    subtitle: "Rectangle ile aynı gelişmiş klavye kısayollarını kullanın.",
+                    subtitle: "Tüm klavye kısayollarını etkinleştirir.",
                     isOn: $settings.snapShortcutsEnabled
                 )
+                
+                Divider()
+                
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack {
+                        Text("Pencereler Arası Boşluk (Gaps):")
+                            .font(.system(size: 13, weight: .semibold, design: .rounded))
+                        Spacer()
+                        Text("\(Int(settings.snapWindowGaps)) px")
+                            .font(.system(size: 12, weight: .bold, design: .monospaced))
+                            .foregroundColor(.blue)
+                    }
+                    Slider(value: $settings.snapWindowGaps, in: 0...24, step: 2)
+                }
                 
                 Divider()
                 
@@ -170,13 +200,15 @@ private struct SnapSettingsSection: View {
                         .font(.system(size: 13, weight: .bold, design: .rounded))
                     
                     LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
-                        ShortcutRow(key: "⌥ + ⌃ + Sol / Sağ Ok", label: "Sol / Sağ Yarı Ekran")
-                        ShortcutRow(key: "⌥ + ⌃ + Yukarı / Aşağı", label: "Üst / Alt Yarı Ekran")
+                        ShortcutRow(key: "⌥ + ⌃ + Sol / Sağ Ok", label: "Sol / Sağ Yarı (Döngülü)")
+                        ShortcutRow(key: "⌥ + ⌃ + Yukarı / Aşağı", label: "Üst Yarı / Alt Yarı / Max")
                         ShortcutRow(key: "⌥ + ⌃ + Return", label: "Tam Ekran (Maximize)")
                         ShortcutRow(key: "⌥ + ⌃ + C", label: "Merkeze Al")
                         ShortcutRow(key: "⌥ + ⌃ + U / I", label: "Sol Üst / Sağ Üst Çeyrek")
                         ShortcutRow(key: "⌥ + ⌃ + J / K", label: "Sol Alt / Sağ Alt Çeyrek")
-                        ShortcutRow(key: "⌥ + ⌃ + D / F / G", label: "Sol / Orta / Sağ Üçte Bir")
+                        ShortcutRow(key: "⌥ + ⌃ + D / F / G", label: "Sol / Orta / Sağ 1/3")
+                        ShortcutRow(key: "⌥ + ⌃ + E / T", label: "Sol / Sağ 2/3")
+                        ShortcutRow(key: "⌥ + ⌃ + + / -", label: "Pencereyi Büyüt / Küçült")
                         ShortcutRow(key: "⌥ + ⌃ + ⌘ + Oklar", label: "Diğer Monitöre Taşı")
                     }
                 }
@@ -190,7 +222,7 @@ private struct MouseSettingsSection: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
-            HeaderTitle(title: "Linear Mouse & Kaydırma", subtitle: "Bağımsız fare tekerleği, hassasiyet ve ivme kontrolü.")
+            HeaderTitle(title: "Linear Mouse Pro & Kaydırma", subtitle: "Bağımsız fare tekerleği, tuşlu tekerlek aksiyonları ve ivme kontrolü.")
             
             SettingsCard {
                 ToggleRow(
@@ -209,25 +241,48 @@ private struct MouseSettingsSection: View {
                 
                 Divider()
                 
+                Text("Tekerlek & Tuş Modifikatörleri (Modifiers):")
+                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                
                 ToggleRow(
-                    title: "Shift + Tekerlek ile Yatay Kaydırma",
-                    subtitle: "Shift tuşuna basılı tutarak tekerleği çevirdiğinizde sayfayı sağa/sola kaydırır.",
+                    title: "Cmd + Tekerlek: Yakınlaştır / Uzaklaştır (Zoom)",
+                    subtitle: "Tarayıcılarda ve belgelerde sayfayı yakınlaştırır.",
+                    isOn: $settings.cmdZoomScrollEnabled
+                )
+                
+                ToggleRow(
+                    title: "Shift + Tekerlek: Yatay Kaydırma",
+                    subtitle: "Tekerleği çevirirken sayfayı sağa/sola kaydırır.",
                     isOn: $settings.shiftHorizontalScrollEnabled
+                )
+                
+                ToggleRow(
+                    title: "Option + Tekerlek: 3x Süper Hızlı Kaydırma",
+                    subtitle: "Uzun dökümanlarda 3 kat daha hızlı kaydırma sağlar.",
+                    isOn: $settings.optionFastScrollEnabled
+                )
+                
+                ToggleRow(
+                    title: "Control + Tekerlek: 0.3x Hassas Yavaş Kaydırma",
+                    subtitle: "Piksel hassasiyetinde yavaş ve kontrollü kaydırır.",
+                    isOn: $settings.ctrlSlowScrollEnabled
                 )
                 
                 Divider()
                 
                 VStack(alignment: .leading, spacing: 6) {
                     HStack {
-                        Text("Kaydırma Hızı Çarpanı:")
+                        Text("Genel Kaydırma Hızı:")
                             .font(.system(size: 13, weight: .semibold, design: .rounded))
                         Spacer()
-                        Text(String(format: "%.1fx", settings.scrollSpeedMultiplier))
+                        Text(String(format: "%.2fx", settings.scrollSpeedMultiplier))
                             .font(.system(size: 12, weight: .bold, design: .monospaced))
                             .foregroundColor(.blue)
                     }
                     Slider(value: $settings.scrollSpeedMultiplier, in: 0.5...3.0, step: 0.25)
                 }
+                
+                Stepper("Tekerlek Çentiği Başına Satır: \(settings.linesPerScrollTick)", value: $settings.linesPerScrollTick, in: 1...10)
                 
                 Divider()
                 
@@ -316,7 +371,6 @@ private struct ClipboardSettingsSection: View {
         VStack(alignment: .leading, spacing: 18) {
             HeaderTitle(title: "Pano Geçmişi (Win + V)", subtitle: "Kopyaladığınız her şeyi saklar, istediğiniz zaman geri yapıştırın.")
             
-            // Explanation Info Card
             HStack(alignment: .top, spacing: 14) {
                 Image(systemName: "info.circle.fill")
                     .foregroundColor(.purple)
@@ -403,7 +457,7 @@ private struct PermissionsSettingsSection: View {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("WinMac — Windows to Mac Super Toolkit")
                         .font(.system(size: 14, weight: .bold, design: .rounded))
-                    Text("Sürüm 2.0.0 • %100 Açık Kaynak & Ücretsiz")
+                    Text("Sürüm 3.0.0 Pro • %100 Açık Kaynak & Ücretsiz")
                         .font(.system(size: 12))
                         .foregroundColor(.secondary)
                 }

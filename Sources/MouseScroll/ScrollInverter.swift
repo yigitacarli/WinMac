@@ -16,8 +16,13 @@ public final class ScrollInverter: @unchecked Sendable {
         let defaults = UserDefaults.standard
         let invertV = defaults.object(forKey: "invertMouseWheel") as? Bool ?? true
         let invertH = defaults.object(forKey: "invertHorizontalScroll") as? Bool ?? true
-        let speedMult = defaults.object(forKey: "scrollSpeedMultiplier") as? Double ?? 1.0
+        var speedMult = defaults.object(forKey: "scrollSpeedMultiplier") as? Double ?? 1.0
+        let linesPerTick = defaults.object(forKey: "linesPerScrollTick") as? Int ?? 3
+        
         let shiftH = defaults.object(forKey: "shiftHorizontalScrollEnabled") as? Bool ?? true
+        let cmdZoom = defaults.object(forKey: "cmdZoomScrollEnabled") as? Bool ?? true
+        let optFast = defaults.object(forKey: "optionFastScrollEnabled") as? Bool ?? true
+        let ctrlSlow = defaults.object(forKey: "ctrlSlowScrollEnabled") as? Bool ?? true
         
         let flags = event.flags
         var deltaY = Double(event.getIntegerValueField(.scrollWheelEventDeltaAxis1))
@@ -25,6 +30,30 @@ public final class ScrollInverter: @unchecked Sendable {
         
         var fixedDeltaY = event.getDoubleValueField(.scrollWheelEventFixedPtDeltaAxis1)
         var fixedDeltaX = event.getDoubleValueField(.scrollWheelEventFixedPtDeltaAxis2)
+        
+        // 1. LinearMouse Pro: Cmd + Wheel -> Zoom In / Zoom Out
+        if flags.contains(.maskCommand) && cmdZoom && deltaY != 0 {
+            let zoomIn = deltaY > 0
+            DispatchQueue.main.async {
+                // Key 24 is '+' / '=', Key 27 is '-'
+                SystemUtils.sendKeystroke(keyCode: zoomIn ? 24 : 27, flags: .maskCommand)
+            }
+            return nil
+        }
+        
+        // 2. LinearMouse Pro: Option + Wheel -> 3x Fast Scroll
+        if flags.contains(.maskAlternate) && optFast {
+            speedMult *= 3.0
+        }
+        
+        // 3. LinearMouse Pro: Control + Wheel -> 0.3x Slow Precision Scroll
+        if flags.contains(.maskControl) && ctrlSlow {
+            speedMult *= 0.3
+        }
+        
+        // 4. Multiply with linesPerTick
+        let lineFactor = Double(linesPerTick) / 3.0
+        speedMult *= lineFactor
         
         // Invert Vertical Scroll
         if invertV {

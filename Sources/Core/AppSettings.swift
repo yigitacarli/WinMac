@@ -79,7 +79,7 @@ public final class AppSettings: ObservableObject {
         didSet { defaults.set(itemSize, forKey: "itemSize") }
     }
     
-    // MARK: - Linear Mouse & Scroll Settings
+    // MARK: - Linear Mouse & Scroll Pro Settings
     @Published public var invertMouseWheel: Bool {
         didSet { defaults.set(invertMouseWheel, forKey: "invertMouseWheel") }
     }
@@ -95,8 +95,20 @@ public final class AppSettings: ObservableObject {
     @Published public var scrollSpeedMultiplier: Double {
         didSet { defaults.set(scrollSpeedMultiplier, forKey: "scrollSpeedMultiplier") }
     }
+    @Published public var linesPerScrollTick: Int {
+        didSet { defaults.set(linesPerScrollTick, forKey: "linesPerScrollTick") }
+    }
     @Published public var shiftHorizontalScrollEnabled: Bool {
         didSet { defaults.set(shiftHorizontalScrollEnabled, forKey: "shiftHorizontalScrollEnabled") }
+    }
+    @Published public var cmdZoomScrollEnabled: Bool {
+        didSet { defaults.set(cmdZoomScrollEnabled, forKey: "cmdZoomScrollEnabled") }
+    }
+    @Published public var optionFastScrollEnabled: Bool {
+        didSet { defaults.set(optionFastScrollEnabled, forKey: "optionFastScrollEnabled") }
+    }
+    @Published public var ctrlSlowScrollEnabled: Bool {
+        didSet { defaults.set(ctrlSlowScrollEnabled, forKey: "ctrlSlowScrollEnabled") }
     }
     
     // MARK: - Keyboard & Muscle Memory Settings
@@ -126,12 +138,18 @@ public final class AppSettings: ObservableObject {
         didSet { defaults.set(maxClipboardItems, forKey: "maxClipboardItems") }
     }
     
-    // MARK: - Window Snapping (Rectangle Power Set)
+    // MARK: - Rectangle Pro (Window Snapping & Drag-to-Snap)
     @Published public var aeroSnapEnabled: Bool {
         didSet { defaults.set(aeroSnapEnabled, forKey: "aeroSnapEnabled") }
     }
+    @Published public var dragToSnapEnabled: Bool {
+        didSet { defaults.set(dragToSnapEnabled, forKey: "dragToSnapEnabled") }
+    }
     @Published public var snapShortcutsEnabled: Bool {
         didSet { defaults.set(snapShortcutsEnabled, forKey: "snapShortcutsEnabled") }
+    }
+    @Published public var cycleRepeatedShortcuts: Bool {
+        didSet { defaults.set(cycleRepeatedShortcuts, forKey: "cycleRepeatedShortcuts") }
     }
     @Published public var snapWindowGaps: Double {
         didSet { defaults.set(snapWindowGaps, forKey: "snapWindowGaps") }
@@ -169,7 +187,11 @@ public final class AppSettings: ObservableObject {
         self.smoothScrollEnabled = defaults.object(forKey: "smoothScrollEnabled") as? Bool ?? true
         self.disableMouseAcceleration = defaults.object(forKey: "disableMouseAcceleration") as? Bool ?? false
         self.scrollSpeedMultiplier = defaults.object(forKey: "scrollSpeedMultiplier") as? Double ?? 1.0
+        self.linesPerScrollTick = defaults.object(forKey: "linesPerScrollTick") as? Int ?? 3
         self.shiftHorizontalScrollEnabled = defaults.object(forKey: "shiftHorizontalScrollEnabled") as? Bool ?? true
+        self.cmdZoomScrollEnabled = defaults.object(forKey: "cmdZoomScrollEnabled") as? Bool ?? true
+        self.optionFastScrollEnabled = defaults.object(forKey: "optionFastScrollEnabled") as? Bool ?? true
+        self.ctrlSlowScrollEnabled = defaults.object(forKey: "ctrlSlowScrollEnabled") as? Bool ?? true
         
         self.ctrlToCmdRemapEnabled = defaults.object(forKey: "ctrlToCmdRemapEnabled") as? Bool ?? true
         self.excludedAppsForCtrl = defaults.stringArray(forKey: "excludedAppsForCtrl") ?? [
@@ -189,7 +211,9 @@ public final class AppSettings: ObservableObject {
         self.maxClipboardItems = defaults.object(forKey: "maxClipboardItems") as? Int ?? 50
         
         self.aeroSnapEnabled = defaults.object(forKey: "aeroSnapEnabled") as? Bool ?? true
+        self.dragToSnapEnabled = defaults.object(forKey: "dragToSnapEnabled") as? Bool ?? true
         self.snapShortcutsEnabled = defaults.object(forKey: "snapShortcutsEnabled") as? Bool ?? true
+        self.cycleRepeatedShortcuts = defaults.object(forKey: "cycleRepeatedShortcuts") as? Bool ?? true
         self.snapWindowGaps = defaults.object(forKey: "snapWindowGaps") as? Double ?? 0.0
         
         self.winLToLockEnabled = defaults.object(forKey: "winLToLockEnabled") as? Bool ?? true
