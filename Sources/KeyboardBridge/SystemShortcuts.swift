@@ -9,11 +9,14 @@ public final class SystemShortcuts: @unchecked Sendable {
     public func handleKeyEvent(type: CGEventType, event: CGEvent) -> CGEvent? {
         guard type == .keyDown else { return event }
         
+        let defaults = UserDefaults.standard
+        let winLLock = defaults.object(forKey: "winLToLockEnabled") as? Bool ?? true
+        
         let flags = event.flags
         let keyCode = CGKeyCode(event.getIntegerValueField(.keyboardEventKeycode))
         
         // 1. Win+L / Option+L -> Lock Screen (L is keyCode 37)
-        if keyCode == 37 {
+        if keyCode == 37 && winLLock {
             if (flags.contains(.maskAlternate) && flags.contains(.maskCommand)) || (flags.contains(.maskAlternate) && !flags.contains(.maskControl)) {
                 DispatchQueue.main.async {
                     SystemUtils.lockScreen()

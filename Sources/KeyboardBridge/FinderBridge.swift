@@ -9,39 +9,59 @@ public final class FinderBridge: @unchecked Sendable {
     public func handleKeyEvent(type: CGEventType, event: CGEvent) -> CGEvent? {
         guard type == .keyDown else { return event }
         
+        let defaults = UserDefaults.standard
+        let enterOpen = defaults.object(forKey: "finderEnterToOpen") as? Bool ?? true
+        let f2Rename = defaults.object(forKey: "finderF2ToRename") as? Bool ?? true
+        let deleteTrash = defaults.object(forKey: "finderDeleteToTrash") as? Bool ?? true
+        
         let flags = event.flags
         let keyCode = CGKeyCode(event.getIntegerValueField(.keyboardEventKeycode))
         
-        // 1. Enter Key (keyCode 36) -> Open file (Cmd + O)
+        // 1. Return / Enter Key (keyCode 36) -> Open selected file/folder
         if keyCode == 36 && flags.intersection([.maskCommand, .maskControl, .maskAlternate, .maskShift]).isEmpty {
-            DispatchQueue.main.async {
+            if enterOpen {
+                DispatchQueue.main.async {
+                    if let frontApp = NSWorkspace.shared.frontmostApplication,
+                       frontApp.bundleIdentifier == "com.apple.finder" {
+                        SystemUtils.sendKeystroke(keyCode: 125, flags: .maskCommand)
+                    }
+                }
                 if let frontApp = NSWorkspace.shared.frontmostApplication,
                    frontApp.bundleIdentifier == "com.apple.finder" {
-                    SystemUtils.sendKeystroke(keyCode: 31, flags: .maskCommand) // 31 is O
+                    return nil
                 }
             }
-            // If in finder, swallow
-            if let frontApp = NSWorkspace.shared.frontmostApplication,
-               frontApp.bundleIdentifier == "com.apple.finder" {
-                return nil
-            }
         }
         
-        // 2. F2 Key (keyCode 120) -> Rename file (Enter)
+        // 2. F2 Key (keyCode 120) -> Rename selected file (Return)
         if keyCode == 120 {
-            if let frontApp = NSWorkspace.shared.frontmostApplication,
-               frontApp.bundleIdentifier == "com.apple.finder" {
-                SystemUtils.sendKeystroke(keyCode: 36, flags: [])
-                return nil
+            if f2Rename {
+                DispatchQueue.main.async {
+                    if let frontApp = NSWorkspace.shared.frontmostApplication,
+                       frontApp.bundleIdentifier == "com.apple.finder" {
+                        SystemUtils.sendKeystroke(keyCode: 36, flags: [])
+                    }
+                }
+                if let frontApp = NSWorkspace.shared.frontmostApplication,
+                   frontApp.bundleIdentifier == "com.apple.finder" {
+                    return nil
+                }
             }
         }
         
-        // 3. Delete / Backspace (keyCode 51 or 117) -> Move to Trash (Cmd + Backspace)
+        // 3. Delete / Backspace Key (keyCode 51 or 117) -> Move to Trash (Cmd + Delete)
         if (keyCode == 51 || keyCode == 117) && flags.intersection([.maskCommand, .maskControl, .maskAlternate, .maskShift]).isEmpty {
-            if let frontApp = NSWorkspace.shared.frontmostApplication,
-               frontApp.bundleIdentifier == "com.apple.finder" {
-                SystemUtils.sendKeystroke(keyCode: 51, flags: .maskCommand)
-                return nil
+            if deleteTrash {
+                DispatchQueue.main.async {
+                    if let frontApp = NSWorkspace.shared.frontmostApplication,
+                       frontApp.bundleIdentifier == "com.apple.finder" {
+                        SystemUtils.sendKeystroke(keyCode: 51, flags: .maskCommand)
+                    }
+                }
+                if let frontApp = NSWorkspace.shared.frontmostApplication,
+                   frontApp.bundleIdentifier == "com.apple.finder" {
+                    return nil
+                }
             }
         }
         

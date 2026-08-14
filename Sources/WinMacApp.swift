@@ -44,7 +44,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
     private func updateStatusMenu() {
         let menu = NSMenu()
         
-        let titleItem = NSMenuItem(title: "WinMac (AltTab+ & Tools)", action: nil, keyEquivalent: "")
+        let titleItem = NSMenuItem(title: "WinMac (Alt + Tab & Superpowers)", action: nil, keyEquivalent: "")
         titleItem.isEnabled = false
         menu.addItem(titleItem)
         menu.addItem(NSMenuItem.separator())
@@ -61,7 +61,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         
         let altTabItem = NSMenuItem(
-            title: "AltTab Pencere Değiştirici: \(AppSettings.shared.altTabEnabled ? "Açık" : "Kapalı")",
+            title: "Alt + Tab Pencere Değiştirici: \(AppSettings.shared.altTabEnabled ? "Açık" : "Kapalı")",
             action: #selector(toggleAltTab),
             keyEquivalent: ""
         )
@@ -76,6 +76,14 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         mouseScrollItem.target = self
         menu.addItem(mouseScrollItem)
         
+        let snapItem = NSMenuItem(
+            title: "Pencere Yaslama (Rectangle): \(AppSettings.shared.snapShortcutsEnabled ? "Açık" : "Kapalı")",
+            action: #selector(toggleSnap),
+            keyEquivalent: ""
+        )
+        snapItem.target = self
+        menu.addItem(snapItem)
+        
         let ctrlCmdItem = NSMenuItem(
             title: "Ctrl -> Cmd Çevirici: \(AppSettings.shared.ctrlToCmdRemapEnabled ? "Açık" : "Kapalı")",
             action: #selector(toggleCtrlCmd),
@@ -85,7 +93,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(ctrlCmdItem)
         
         let clipItem = NSMenuItem(
-            title: "Win+V Pano Geçmişi: \(AppSettings.shared.clipboardHistoryEnabled ? "Açık" : "Kapalı")",
+            title: "Win + V Pano Geçmişi: \(AppSettings.shared.clipboardHistoryEnabled ? "Açık" : "Kapalı")",
             action: #selector(toggleClipboard),
             keyEquivalent: ""
         )
@@ -122,6 +130,11 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
     
     @objc private func toggleMouseScroll() {
         AppSettings.shared.invertMouseWheel.toggle()
+        updateStatusMenu()
+    }
+    
+    @objc private func toggleSnap() {
+        AppSettings.shared.snapShortcutsEnabled.toggle()
         updateStatusMenu()
     }
     

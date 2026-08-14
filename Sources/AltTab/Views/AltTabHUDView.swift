@@ -11,30 +11,54 @@ public struct AltTabHUDView: View {
     public var body: some View {
         VStack(spacing: 0) {
             // Header Bar
-            HStack(spacing: 12) {
-                // Style Picker
-                HStack(spacing: 4) {
+            HStack(spacing: 16) {
+                // WinMac Pill Badge
+                HStack(spacing: 6) {
+                    Image(systemName: "macwindow.on.rectangle")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundColor(.cyan)
+                    
+                    Text("Alt + Tab")
+                        .font(.system(size: 13, weight: .bold, design: .rounded))
+                        .foregroundColor(.white)
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+                .background(
+                    Capsule()
+                        .fill(Color.white.opacity(0.1))
+                )
+                
+                // Style Switcher Segmented Control
+                HStack(spacing: 2) {
                     ForEach(SwitcherStyle.allCases) { style in
                         Button(action: {
                             settings.switcherStyle = style
                         }) {
-                            Image(systemName: iconForStyle(style))
-                                .font(.system(size: 11, weight: .semibold))
-                                .foregroundColor(settings.switcherStyle == style ? .white : .secondary)
-                                .padding(6)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 6, style: .continuous)
-                                        .fill(settings.switcherStyle == style ? Color.accentColor : Color.clear)
-                                )
+                            HStack(spacing: 4) {
+                                Image(systemName: iconForStyle(style))
+                                    .font(.system(size: 11, weight: .semibold))
+                            }
+                            .foregroundColor(settings.switcherStyle == style ? .white : .secondary)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                            .background(
+                                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                    .fill(
+                                        settings.switcherStyle == style
+                                            ? AnyShapeStyle(LinearGradient(colors: [Color.blue, Color.blue.opacity(0.8)], startPoint: .top, endPoint: .bottom))
+                                            : AnyShapeStyle(Color.clear)
+                                    )
+                            )
                         }
                         .buttonStyle(PlainButtonStyle())
                         .help(style.title)
                     }
                 }
-                .padding(4)
+                .padding(3)
                 .background(
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .fill(Color.white.opacity(0.08))
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(Color.black.opacity(0.3))
                 )
                 
                 Spacer()
@@ -42,28 +66,34 @@ public struct AltTabHUDView: View {
                 // Real-time Search Filter
                 if settings.searchFilterEnabled {
                     SearchBarView(text: $state.searchText)
-                        .frame(width: 240)
+                        .frame(width: 230)
                 }
             }
-            .padding(.horizontal, 16)
-            .padding(.top, 14)
-            .padding(.bottom, 6)
+            .padding(.horizontal, 20)
+            .padding(.top, 16)
+            .padding(.bottom, 10)
             
             Divider()
-                .background(Color.white.opacity(0.12))
+                .background(
+                    LinearGradient(
+                        colors: [Color.white.opacity(0.02), Color.white.opacity(0.18), Color.white.opacity(0.02)],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
             
             // Content
             let list = state.filteredWindows
             if list.isEmpty {
-                VStack(spacing: 10) {
-                    Image(systemName: "questionmark.folder")
-                        .font(.system(size: 36))
-                        .foregroundColor(.secondary)
+                VStack(spacing: 12) {
+                    Image(systemName: "square.dashed")
+                        .font(.system(size: 40))
+                        .foregroundColor(.secondary.opacity(0.6))
                     Text("Açık pencere bulunamadı")
-                        .font(.system(size: 13, weight: .medium))
+                        .font(.system(size: 13, weight: .medium, design: .rounded))
                         .foregroundColor(.secondary)
                 }
-                .frame(maxWidth: .infinity, minHeight: 180)
+                .frame(maxWidth: .infinity, minHeight: 200)
             } else {
                 switch settings.switcherStyle {
                 case .thumbnails:
@@ -76,36 +106,54 @@ public struct AltTabHUDView: View {
             }
             
             Divider()
-                .background(Color.white.opacity(0.12))
+                .background(
+                    LinearGradient(
+                        colors: [Color.white.opacity(0.02), Color.white.opacity(0.18), Color.white.opacity(0.02)],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
             
-            // Footer Shortcuts Helper
-            HStack(spacing: 14) {
-                ShortcutHint(key: "Tab", label: "Sonraki")
-                ShortcutHint(key: "⇧ Tab", label: "Önceki")
-                ShortcutHint(key: "W", label: "Pencereyi Kapat")
-                ShortcutHint(key: "Q", label: "Uygulamayı Kapat")
-                ShortcutHint(key: "F", label: "Büyüt")
-                ShortcutHint(key: "M", label: "Küçült")
+            // Modern Keycap Footer
+            HStack(spacing: 12) {
+                KeyCapHint(key: "Tab", label: "Sonraki")
+                KeyCapHint(key: "⇧ Tab", label: "Önceki")
+                KeyCapHint(key: "W", label: "Kapat")
+                KeyCapHint(key: "Q", label: "Çık")
+                KeyCapHint(key: "F", label: "Büyüt")
+                KeyCapHint(key: "M", label: "Küçült")
                 
                 Spacer()
                 
-                ShortcutHint(key: "↵ / Bırak", label: "Odaklan")
-                ShortcutHint(key: "Esc", label: "İptal")
+                KeyCapHint(key: "↵ / Bırak", label: "Odaklan")
+                KeyCapHint(key: "Esc", label: "İptal")
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
-            .background(Color.black.opacity(0.2))
+            .padding(.horizontal, 20)
+            .padding(.vertical, 11)
+            .background(Color.black.opacity(0.35))
         }
-        .frame(minWidth: 540, maxWidth: 840)
+        .frame(minWidth: 560, maxWidth: 860)
         .background(
-            VisualEffectBlur(material: .hudWindow, blendingMode: .behindWindow)
+            VisualEffectBlur(material: .popover, blendingMode: .behindWindow)
         )
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .stroke(Color.white.opacity(0.15), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .stroke(
+                    LinearGradient(
+                        colors: [
+                            Color.white.opacity(0.35),
+                            Color.white.opacity(0.1),
+                            Color.cyan.opacity(0.2),
+                            Color.white.opacity(0.05)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 1.2
+                )
         )
-        .shadow(color: Color.black.opacity(0.4), radius: 24, y: 10)
+        .shadow(color: Color.black.opacity(0.55), radius: 32, y: 16)
     }
     
     private func iconForStyle(_ style: SwitcherStyle) -> String {
@@ -117,30 +165,40 @@ public struct AltTabHUDView: View {
     }
 }
 
-private struct ShortcutHint: View {
+private struct KeyCapHint: View {
     let key: String
     let label: String
     
     var body: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: 5) {
             Text(key)
                 .font(.system(size: 9, weight: .bold, design: .monospaced))
-                .foregroundColor(.primary)
-                .padding(.horizontal, 5)
-                .padding(.vertical, 2)
+                .foregroundColor(.white.opacity(0.95))
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2.5)
                 .background(
-                    RoundedRectangle(cornerRadius: 4, style: .continuous)
-                        .fill(Color.white.opacity(0.15))
+                    RoundedRectangle(cornerRadius: 5, style: .continuous)
+                        .fill(
+                            LinearGradient(
+                                colors: [Color.white.opacity(0.22), Color.white.opacity(0.1)],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        )
                 )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 5, style: .continuous)
+                        .stroke(Color.white.opacity(0.25), lineWidth: 0.8)
+                )
+                .shadow(color: Color.black.opacity(0.25), radius: 2, y: 1)
             
             Text(label)
-                .font(.system(size: 10, weight: .regular))
+                .font(.system(size: 10.5, weight: .medium, design: .rounded))
                 .foregroundColor(.secondary)
         }
     }
 }
 
-// NSVisualEffectView wrapper for SwiftUI
 public struct VisualEffectBlur: NSViewRepresentable {
     var material: NSVisualEffectView.Material
     var blendingMode: NSVisualEffectView.BlendingMode

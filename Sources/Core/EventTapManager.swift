@@ -7,7 +7,7 @@ public final class EventTapManager: @unchecked Sendable {
     private var eventTap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
     
-    // AltTab hotkey tracking
+    // Alt + Tab hotkey tracking
     private var isAltTabActive: Bool = false
     private var isAltHeld: Bool = false
     
@@ -68,7 +68,7 @@ public final class EventTapManager: @unchecked Sendable {
             return Unmanaged.passRetained(event)
         }
         
-        // 1. Mouse Scroll Inversion
+        // 1. Mouse Scroll Inversion (LinearMouse Engine)
         if type == .scrollWheel {
             if let modified = ScrollInverter.shared.handleScrollEvent(event: event) {
                 return Unmanaged.passRetained(modified)
@@ -76,10 +76,11 @@ public final class EventTapManager: @unchecked Sendable {
             return nil
         }
         
+        let defaults = UserDefaults.standard
         let flags = event.flags
         let keyCode = CGKeyCode(event.getIntegerValueField(.keyboardEventKeycode))
         
-        // 2. Modifier Key Release check (Option/Alt released while AltTab HUD is active)
+        // 2. Modifier Key Release check (Option/Alt released while Alt + Tab HUD is active)
         if type == .flagsChanged {
             let altHeld = flags.contains(.maskAlternate)
             self.isAltHeld = altHeld
@@ -93,8 +94,9 @@ public final class EventTapManager: @unchecked Sendable {
             return Unmanaged.passRetained(event)
         }
         
-        // 3. Alt+Tab / Option+Tab Trigger
-        if type == .keyDown {
+        // 3. Alt + Tab Trigger
+        let altTabEnabled = defaults.object(forKey: "altTabEnabled") as? Bool ?? true
+        if type == .keyDown && altTabEnabled {
             // Option + Tab (Tab keyCode = 48)
             if keyCode == 48 && flags.contains(.maskAlternate) && !flags.contains(.maskControl) {
                 if !isAltTabActive {
@@ -116,7 +118,8 @@ public final class EventTapManager: @unchecked Sendable {
         }
         
         // 4. Win + V / Option + V -> Clipboard History
-        if type == .keyDown {
+        let clipEnabled = defaults.object(forKey: "clipboardHistoryEnabled") as? Bool ?? true
+        if type == .keyDown && clipEnabled {
             if (keyCode == 9 && flags.contains(.maskAlternate) && !flags.contains(.maskCommand)) ||
                (keyCode == 9 && flags.contains(.maskCommand) && flags.contains(.maskShift)) {
                 DispatchQueue.main.async {
@@ -126,21 +129,13 @@ public final class EventTapManager: @unchecked Sendable {
             }
         }
         
-        // 5. Window Snapping
-        if flags.contains(.maskAlternate) && (flags.contains(.maskControl) || flags.contains(.maskCommand)) {
-            if keyCode == 123 { // Left Arrow
-                DispatchQueue.main.async { SnapEngine.shared.snapFocusedWindow(to: .leftHalf) }
-                return nil
-            } else if keyCode == 124 { // Right Arrow
-                DispatchQueue.main.async { SnapEngine.shared.snapFocusedWindow(to: .rightHalf) }
-                return nil
-            } else if keyCode == 126 { // Up Arrow
-                DispatchQueue.main.async { SnapEngine.shared.snapFocusedWindow(to: .maximize) }
-                return nil
-            } else if keyCode == 125 { // Down Arrow
-                DispatchQueue.main.async { SnapEngine.shared.snapFocusedWindow(to: .center) }
-                return nil
+        // 5. Rectangle Window Snapping (Option + Control + ...)
+        if let snapResult = SnapEngine.shared.handleKeyEvent(type: type, event: event) {
+            if snapResult !== event {
+                return Unmanaged.passRetained(snapResult)
             }
+        } else {
+            return nil
         }
         
         // 6. System Shortcuts

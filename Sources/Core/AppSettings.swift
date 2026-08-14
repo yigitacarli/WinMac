@@ -35,7 +35,7 @@ public enum SwitcherDisplayMode: String, CaseIterable, Identifiable, Codable, Se
 }
 
 public enum AltTabShortcut: String, CaseIterable, Identifiable, Codable, Sendable {
-    case optionTab = "Option + Tab (Alt+Tab)"
+    case optionTab = "Option + Tab (Alt + Tab)"
     case cmdTab = "Command + Tab"
     case ctrlTab = "Control + Tab"
     
@@ -48,7 +48,7 @@ public final class AppSettings: ObservableObject {
     
     private let defaults = UserDefaults.standard
     
-    // MARK: - AltTab Settings
+    // MARK: - Alt + Tab Settings
     @Published public var altTabEnabled: Bool {
         didSet { defaults.set(altTabEnabled, forKey: "altTabEnabled") }
     }
@@ -71,15 +71,24 @@ public final class AppSettings: ObservableObject {
         didSet { defaults.set(itemSize, forKey: "itemSize") }
     }
     
-    // MARK: - Mouse & Scroll Settings
+    // MARK: - Linear Mouse & Scroll Settings
     @Published public var invertMouseWheel: Bool {
         didSet { defaults.set(invertMouseWheel, forKey: "invertMouseWheel") }
+    }
+    @Published public var invertHorizontalScroll: Bool {
+        didSet { defaults.set(invertHorizontalScroll, forKey: "invertHorizontalScroll") }
     }
     @Published public var smoothScrollEnabled: Bool {
         didSet { defaults.set(smoothScrollEnabled, forKey: "smoothScrollEnabled") }
     }
     @Published public var disableMouseAcceleration: Bool {
         didSet { defaults.set(disableMouseAcceleration, forKey: "disableMouseAcceleration") }
+    }
+    @Published public var scrollSpeedMultiplier: Double {
+        didSet { defaults.set(scrollSpeedMultiplier, forKey: "scrollSpeedMultiplier") }
+    }
+    @Published public var shiftHorizontalScrollEnabled: Bool {
+        didSet { defaults.set(shiftHorizontalScrollEnabled, forKey: "shiftHorizontalScrollEnabled") }
     }
     
     // MARK: - Keyboard & Muscle Memory Settings
@@ -109,12 +118,15 @@ public final class AppSettings: ObservableObject {
         didSet { defaults.set(maxClipboardItems, forKey: "maxClipboardItems") }
     }
     
-    // MARK: - Window Snapping (Aero Snap)
+    // MARK: - Window Snapping (Rectangle Power Set)
     @Published public var aeroSnapEnabled: Bool {
         didSet { defaults.set(aeroSnapEnabled, forKey: "aeroSnapEnabled") }
     }
     @Published public var snapShortcutsEnabled: Bool {
         didSet { defaults.set(snapShortcutsEnabled, forKey: "snapShortcutsEnabled") }
+    }
+    @Published public var snapWindowGaps: Double {
+        didSet { defaults.set(snapWindowGaps, forKey: "snapWindowGaps") }
     }
     
     // MARK: - System Shortcuts
@@ -143,8 +155,11 @@ public final class AppSettings: ObservableObject {
         self.itemSize = defaults.object(forKey: "itemSize") as? Double ?? 1.0
         
         self.invertMouseWheel = defaults.object(forKey: "invertMouseWheel") as? Bool ?? true
-        self.smoothScrollEnabled = defaults.object(forKey: "smoothScrollEnabled") as? Bool ?? false
+        self.invertHorizontalScroll = defaults.object(forKey: "invertHorizontalScroll") as? Bool ?? true
+        self.smoothScrollEnabled = defaults.object(forKey: "smoothScrollEnabled") as? Bool ?? true
         self.disableMouseAcceleration = defaults.object(forKey: "disableMouseAcceleration") as? Bool ?? false
+        self.scrollSpeedMultiplier = defaults.object(forKey: "scrollSpeedMultiplier") as? Double ?? 1.0
+        self.shiftHorizontalScrollEnabled = defaults.object(forKey: "shiftHorizontalScrollEnabled") as? Bool ?? true
         
         self.ctrlToCmdRemapEnabled = defaults.object(forKey: "ctrlToCmdRemapEnabled") as? Bool ?? true
         self.excludedAppsForCtrl = defaults.stringArray(forKey: "excludedAppsForCtrl") ?? [
@@ -165,6 +180,7 @@ public final class AppSettings: ObservableObject {
         
         self.aeroSnapEnabled = defaults.object(forKey: "aeroSnapEnabled") as? Bool ?? true
         self.snapShortcutsEnabled = defaults.object(forKey: "snapShortcutsEnabled") as? Bool ?? true
+        self.snapWindowGaps = defaults.object(forKey: "snapWindowGaps") as? Double ?? 0.0
         
         self.winLToLockEnabled = defaults.object(forKey: "winLToLockEnabled") as? Bool ?? true
         self.ctrlShiftEscTaskManager = defaults.object(forKey: "ctrlShiftEscTaskManager") as? Bool ?? true

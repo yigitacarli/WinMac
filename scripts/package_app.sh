@@ -18,12 +18,14 @@ mkdir -p "$RESOURCES_DIR"
 cp .build/release/WinMac "$MACOS_DIR/WinMac"
 chmod +x "$MACOS_DIR/WinMac"
 
-# Copy Info.plist
+# Copy Info.plist and Icon
 cp Resources/Info.plist "$CONTENTS_DIR/Info.plist"
+if [ -f "Resources/AppIcon.icns" ]; then
+    cp Resources/AppIcon.icns "$RESOURCES_DIR/AppIcon.icns"
+fi
 
-# Code sign with ad-hoc signature so macOS Accessibility permissions work properly
+# Code sign with ad-hoc signature
 echo "✍️ Ad-hoc code signing WinMac.app..."
 codesign --force --deep --sign - --entitlements Resources/WinMac.entitlements "$APP_DIR"
 
-echo "✅ Successfully created $APP_DIR!"
-echo "You can run it via: open $APP_DIR"
+echo "✅ Successfully created $APP_DIR with AppIcon!"

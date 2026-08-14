@@ -23,6 +23,10 @@ public final class CtrlToCmdMapper: @unchecked Sendable {
     ]
     
     public func handleKeyEvent(type: CGEventType, event: CGEvent) -> CGEvent? {
+        let defaults = UserDefaults.standard
+        let isEnabled = defaults.object(forKey: "ctrlToCmdRemapEnabled") as? Bool ?? true
+        guard isEnabled else { return event }
+        
         let flags = event.flags
         guard flags.contains(.maskControl) && !flags.contains(.maskCommand) else {
             return event
@@ -32,10 +36,13 @@ public final class CtrlToCmdMapper: @unchecked Sendable {
         
         // Special case: Ctrl+Shift+Esc is Task Manager
         if keyCode == 53 && flags.contains(.maskShift) { // Esc
-            DispatchQueue.main.async {
-                SystemUtils.openActivityMonitor()
+            let taskMgrEnabled = defaults.object(forKey: "ctrlShiftEscTaskManager") as? Bool ?? true
+            if taskMgrEnabled {
+                DispatchQueue.main.async {
+                    SystemUtils.openActivityMonitor()
+                }
+                return nil
             }
-            return nil
         }
         
         if targetKeyCodes.contains(keyCode) {
