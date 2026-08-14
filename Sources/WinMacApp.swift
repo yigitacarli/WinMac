@@ -10,6 +10,15 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
     public func applicationDidFinishLaunching(_ notification: Notification) {
         print("[WinMac] Application launching...")
         
+        // Ensure regular Dock application
+        NSApp.setActivationPolicy(.regular)
+        
+        // Set App Icon explicitly on Dock
+        if let iconPath = Bundle.main.path(forResource: "AppIcon", ofType: "icns"),
+           let iconImg = NSImage(contentsOfFile: iconPath) {
+            NSApp.applicationIconImage = iconImg
+        }
+        
         setupStatusBar()
         EventTapManager.shared.start()
         
@@ -23,13 +32,14 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
             }
             .store(in: &cancellables)
         
-        // Open Settings window on launch and bring to front
-        SettingsWindowController.shared.show()
+        // Always present settings window when user opens the app
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            SettingsWindowController.shared.show()
+        }
         
         print("[WinMac] Ready.")
     }
     
-    // When clicked from Launchpad, Applications folder, or Dock icon
     public func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         SettingsWindowController.shared.show()
         return true
