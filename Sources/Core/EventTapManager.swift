@@ -1,0 +1,171 @@
+import Cocoa
+import CoreGraphics
+
+public final class EventTapManager: @unchecked Sendable {
+    public static let shared = EventTapManager()
+    
+    private var eventTap: CFMachPort?
+    private var runLoopSource: CFRunLoopSource?
+    
+    // AltTab hotkey tracking
+    private var isAltTabActive: Bool = false
+    private var isAltHeld: Bool = false
+    
+    private init() {}
+    
+    public func start() {
+        guard eventTap == nil else { return }
+        
+        let eventMask: CGEventMask = (
+            (1 << CGEventType.keyDown.rawValue) |
+            (1 << CGEventType.keyUp.rawValue) |
+            (1 << CGEventType.flagsChanged.rawValue) |
+            (1 << CGEventType.scrollWheel.rawValue)
+        )
+        
+        guard let tap = CGEvent.tapCreate(
+            tap: .cghidEventTap,
+            place: .headInsertEventTap,
+            options: .defaultTap,
+            eventsOfInterest: eventMask,
+            callback: { (proxy, type, event, refcon) -> Unmanaged<CGEvent>? in
+                guard let refcon = refcon else {
+                    return Unmanaged.passRetained(event)
+                }
+                let manager = Unmanaged<EventTapManager>.fromOpaque(refcon).takeUnretainedValue()
+                return manager.handleEvent(proxy: proxy, type: type, event: event)
+            },
+            userInfo: Unmanaged.passUnretained(self).toOpaque()
+        ) else {
+            print("[WinMac] Warning: Failed to create CGEventTap. Needs Accessibility permission.")
+            return
+        }
+        
+        self.eventTap = tap
+        let source = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, tap, 0)
+        self.runLoopSource = source
+        CFRunLoopAddSource(CFRunLoopGetMain(), source, .commonModes)
+        CGEvent.tapEnable(tap: tap, enable: true)
+        print("[WinMac] Global EventTap successfully started.")
+    }
+    
+    public func stop() {
+        if let tap = eventTap {
+            CGEvent.tapEnable(tap: tap, enable: false)
+            if let source = runLoopSource {
+                CFRunLoopRemoveSource(CFRunLoopGetMain(), source, .commonModes)
+                runLoopSource = nil
+            }
+            eventTap = nil
+        }
+    }
+    
+    private func handleEvent(proxy: CGEventTapProxy, type: CGEventType, event: CGEvent) -> Unmanaged<CGEvent>? {
+        if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
+            if let tap = eventTap {
+                CGEvent.tapEnable(tap: tap, enable: true)
+            }
+            return Unmanaged.passRetained(event)
+        }
+        
+        // 1. Mouse Scroll Inversion
+        if type == .scrollWheel {
+            if let modified = ScrollInverter.shared.handleScrollEvent(event: event) {
+                return Unmanaged.passRetained(modified)
+            }
+            return nil
+        }
+        
+        let flags = event.flags
+        let keyCode = CGKeyCode(event.getIntegerValueField(.keyboardEventKeycode))
+        
+        // 2. Modifier Key Release check (Option/Alt released while AltTab HUD is active)
+        if type == .flagsChanged {
+            let altHeld = flags.contains(.maskAlternate)
+            self.isAltHeld = altHeld
+            
+            if isAltTabActive && !altHeld {
+                isAltTabActive = false
+                DispatchQueue.main.async {
+                    AltTabState.shared.confirmSelection()
+                }
+            }
+            return Unmanaged.passRetained(event)
+        }
+        
+        // 3. Alt+Tab / Option+Tab Trigger
+        if type == .keyDown {
+            // Option + Tab (Tab keyCode = 48)
+            if keyCode == 48 && flags.contains(.maskAlternate) && !flags.contains(.maskControl) {
+                if !isAltTabActive {
+                    isAltTabActive = true
+                    DispatchQueue.main.async {
+                        AltTabHUDController.shared.show()
+                    }
+                } else {
+                    DispatchQueue.main.async {
+                        if flags.contains(.maskShift) {
+                            AltTabState.shared.selectPrevious()
+                        } else {
+                            AltTabState.shared.selectNext()
+                        }
+                    }
+                }
+                return nil
+            }
+        }
+        
+        // 4. Win + V / Option + V -> Clipboard History
+        if type == .keyDown {
+            if (keyCode == 9 && flags.contains(.maskAlternate) && !flags.contains(.maskCommand)) ||
+               (keyCode == 9 && flags.contains(.maskCommand) && flags.contains(.maskShift)) {
+                DispatchQueue.main.async {
+                    ClipboardHUDController.shared.toggle()
+                }
+                return nil
+            }
+        }
+        
+        // 5. Window Snapping
+        if flags.contains(.maskAlternate) && (flags.contains(.maskControl) || flags.contains(.maskCommand)) {
+            if keyCode == 123 { // Left Arrow
+                DispatchQueue.main.async { SnapEngine.shared.snapFocusedWindow(to: .leftHalf) }
+                return nil
+            } else if keyCode == 124 { // Right Arrow
+                DispatchQueue.main.async { SnapEngine.shared.snapFocusedWindow(to: .rightHalf) }
+                return nil
+            } else if keyCode == 126 { // Up Arrow
+                DispatchQueue.main.async { SnapEngine.shared.snapFocusedWindow(to: .maximize) }
+                return nil
+            } else if keyCode == 125 { // Down Arrow
+                DispatchQueue.main.async { SnapEngine.shared.snapFocusedWindow(to: .center) }
+                return nil
+            }
+        }
+        
+        // 6. System Shortcuts
+        if let sysResult = SystemShortcuts.shared.handleKeyEvent(type: type, event: event) {
+            if sysResult !== event {
+                return Unmanaged.passRetained(sysResult)
+            }
+        } else {
+            return nil
+        }
+        
+        // 7. Finder Shortcuts
+        if let finderResult = FinderBridge.shared.handleKeyEvent(type: type, event: event) {
+            if finderResult !== event {
+                return Unmanaged.passRetained(finderResult)
+            }
+        } else {
+            return nil
+        }
+        
+        // 8. Ctrl to Cmd Key Remapping
+        if let ctrlResult = CtrlToCmdMapper.shared.handleKeyEvent(type: type, event: event) {
+            return Unmanaged.passRetained(ctrlResult)
+        } else {
+            return nil
+        }
+    }
+}
