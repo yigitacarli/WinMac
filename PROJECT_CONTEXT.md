@@ -1,15 +1,35 @@
 # 🧠 WinMac (AltBridge) — Master Project Context & Architecture
 
-> **Bu dosya, projenin tüm bağlamını, mimarisini, teknik kararlarını ve gelecek yol haritasını kalıcı olarak saklar.**
+> **Bu dosya, projenin tüm bağlamını, mimarisini, teknik kararlarını ve sürüm geçmişini kalıcı olarak saklar.**
 > Yeni bir sohbet, farklı bir yapay zeka modeli veya yeni bir geliştirici bu repoya geldiğinde doğrudan bu dosyayı okuyarak projeye kaldığı yerden sıfır kayıpla devam edebilir.
 
 ---
 
 ## 📌 Proje Özeti & Vizyon
-- **Proje Adı:** WinMac (veya AltBridge / AltTabPlus)
+- **Proje Adı:** WinMac (veya AltBridge)
 - **Amaç:** 
   1. `AltTab macOS` uygulamasının son sürümlerinde **Pro** abonelik arkasına aldığı tüm özellikleri (canlı arama, 3 farklı görünüm modu, kısayollar) **%100 ücretsiz, açık kaynak ve reklamsız** sunmak.
-  2. Windows'tan macOS'e geçen veya Mac'te üretkenlik arayan kullanıcıların en büyük kronik sorunlarını (ters fare tekerleği, `Ctrl+C/V` alışkanlığı, Finder dosya açma, `Win+V` pano geçmişi, pencere yaslama vb.) tek bir hafif (~20MB RAM) yerel Swift/SwiftUI uygulamasında çözmek.
+  2. `Rectangle` pencere yaslama (Aero Snap) ve `LinearMouse` (ters kaydırma, ivme sıfırlama, hız çarpanı) özelliklerini tek bir ultra hafif (~20MB RAM) yerel Swift 6 / SwiftUI uygulamasında toplamak.
+  3. Windows'tan macOS'e geçen kullanıcıların tüm kronik alışkanlıklarını (`Ctrl+C/V`, Finder `Enter`/`F2`/`Delete`, `Win+V` Pano Geçmişi, `Win+L` Kilit) tek pakette çözmek.
+
+---
+
+## 📝 Sürüm Geçmişi (Changelog)
+
+### Sürüm 2.1.0 (Güncel)
+- **İkon Tasarımı:** Arka plan manzarası ve dock simgeleri tamamen temizlendi; saf koyu mat Apple süperelipsi (squircle) üzerinde ışıldayan neon cam katmanları yerleştirildi. %100 şeffaf köşeler ve Apple ortam gölgesi eklendi.
+- **Dock & Reopen Entegrasyonu:** Uygulama `/Applications` veya Launchpad'den tıklandığında ayarlar penceresinin anında odaklanması (`applicationShouldHandleReopen`) sağlandı.
+- **LaunchServices:** `lsregister` ve Dock önbelleği otomatik yenileme desteği.
+
+### Sürüm 2.0.0
+- **Rectangle Entegrasyonu:** Tüm yarı ekran, çeyrek ekran, 3'lü bölme ve çoklu monitör kısayolları (`⌥ + ⌃ + Oklar / U / I / J / K / D / F / G / C / Return / ⌘`) eklendi.
+- **LinearMouse Entegrasyonu:** Bağımsız dikey/yatay ters kaydırma, kaydırma hızı çarpanı (0.5x - 3.0x), Shift+Tekerlek yatay kaydırma ve doğrusal ivme (Linear curve) kontrolleri eklendi.
+- **Liquid Glassmorphism:** `Option + Tab` ekranı çok katmanlı Apple buzlu cam efekti, 3D Keycap tuşları ve 120 FPS yaylanma animasyonlarıyla baştan tasarlandı.
+- **İsimlendirme:** Tüm "AltTab" ibareleri "Alt + Tab" olarak güncellendi.
+- **DMG Paketi:** Tek tıkla indirilebilir `WinMac.dmg` yükleyici scripti (`scripts/create_dmg.sh`) eklendi.
+
+### Sürüm 1.0.0
+- Temel Alt+Tab pencere tarayıcı, canlı önizlemeler, `Win+V` pano geçmişi, Finder Enter/F2/Delete düzeltmeleri ve durum çubuğu menüsü oluşturuldu.
 
 ---
 
@@ -22,13 +42,18 @@ hopeful-lovelace/
 ├── README.md                         # Kullanıcı odaklı GitHub dokümantasyonu
 ├── PROJECT_CONTEXT.md                # Geliştirici & AI için kalıcı hafıza ve mimari
 ├── scripts/
-│   └── package_app.sh                # Release derleme, Info.plist ve ad-hoc imzalama scripti
+│   ├── package_app.sh                # Release derleme, Info.plist ve ad-hoc imzalama scripti
+│   ├── create_dmg.sh                 # Sıkıştırılmış DMG kurulum paketi oluşturucu
+│   ├── make_pure_icon.py             # Apple Squircle kırpma ve şeffaf köşe/gölge üretici
+│   └── make_macos_icon.py            # İkon seti maskeleme aracı
 ├── Resources/
-│   ├── Info.plist                    # LSUIElement = true (Menü çubuğu aracı) & İzin açıklamaları
+│   ├── AppIcon.icns                  # Çoklu retina çözünürlüklü macOS ikonu
+│   ├── AppIcon_1024.png              # 1024x1024 master şeffaf squircle ikon
+│   ├── Info.plist                    # Bundle ID, CFBundleIconFile, macOS 14+ ayarları
 │   └── WinMac.entitlements           # macOS yetkilendirme dosyası
 └── Sources/
-    ├── main.swift                    # NSApplication & AppDelegate başlatıcı
-    ├── WinMacApp.swift               # AppDelegate: NSStatusItem (menü çubuğu) & hızlı anahtarlar
+    ├── main.swift                    # NSApplication.shared (.regular policy) & AppDelegate başlatıcı
+    ├── WinMacApp.swift               # AppDelegate: Status bar, Dock ikonu & Reopen yöneticisi
     ├── Core/
     │   ├── AppSettings.swift         # UserDefaults destekli @MainActor ayar modeli
     │   ├── PermissionsManager.swift  # Accessibility & Screen Recording izin kontrolü
@@ -59,45 +84,8 @@ hopeful-lovelace/
     │   ├── ClipboardHUDController.swift # Win+V için NSPanel yöneticisi
     │   └── ClipboardHUDView.swift    # Win+V aranabilir SwiftUI pano arayüzü
     ├── WindowSnap/
-    │   └── SnapEngine.swift          # Aero Snap: ⌥+⌃+Ok tuşları ile ekran bölme (1/2, 1/4, Maximize)
+    │   └── SnapEngine.swift          # Aero Snap: ⌥+⌃+Ok tuşları ile ekran bölme (1/2, 1/3, 1/4, Maximize)
     └── Settings/
         ├── SettingsWindowController.swift # Ayarlar penceresi yöneticisi
         └── SettingsView.swift        # Çok sekmeli modern SwiftUI Ayarlar paneli
 ```
-
----
-
-## 🛠️ Nasıl Derlenir ve Paketlenir?
-
-1. **Geliştirme Modunda Derleme (Debug):**
-   ```bash
-   swift build
-   ```
-2. **Release Modunda `.app` Paketi Üretme:**
-   ```bash
-   ./scripts/package_app.sh
-   ```
-3. **Uygulamayı Çalıştırma:**
-   ```bash
-   open /Users/yigitacarli/Documents/antigravity/hopeful-lovelace/build/WinMac.app
-   ```
-   *Veya Uygulamalar klasörüne kopyalamak için:*
-   ```bash
-   cp -R build/WinMac.app /Applications/
-   open /Applications/WinMac.app
-   ```
-
----
-
-## 🔒 Swift 6 ve Eşzamanlılık (Concurrency) Kuralları
-- Tüm UI nesneleri (`NSHostingView`, `NSPanel`, `NSWindow`, `ObservableObject` UI State) `@MainActor` ile işaretlenmiştir.
-- `EventTapManager`, `ScrollInverter`, `CtrlToCmdMapper`, `FinderBridge`, `ThumbnailCache` gibi düşük seviyeli sınıflar `@unchecked Sendable` olarak tanımlanıp UI güncellemelerini `DispatchQueue.main.async` veya `Task { @MainActor in ... }` ile iletir.
-- Projede harici 3. parti bağımlılık yoktur; tamamen saf yerel macOS API'ları (`AppKit`, `SwiftUI`, `CoreGraphics`, `ApplicationServices`, `Combine`) kullanılmıştır.
-
----
-
-## 🚀 Gelecek Yol Haritası (İleride Eklenebilecek Özellikler)
-1. **Dock Üzeri Önizlemeler (Taskbar Hover):** Dock simgelerinin üzerine fareyle gelindiğinde mini pencereleri gösterme.
-2. **Aero Shake:** Pencereyi sallayınca arkadaki tüm pencereleri simge durumuna küçültme.
-3. **Pürüzsüz Kaydırma (Smooth Scroll):** Fare tekerleği için fizik tabanlı akıcı kaydırma interpolasyonu.
-4. **Çoklu Dil Desteği:** Türkçe, İngilizce, Almanca, İspanyolca yerelleştirme (Localization).
