@@ -16,7 +16,7 @@ public struct ClipboardHUDView: View {
                     .foregroundColor(.accentColor)
                     .font(.system(size: 15))
                 
-                Text("Pano Geçmişi (Win + V)")
+                Text("Pano Geçmişi (⌥ + V)")
                     .font(.system(size: 13, weight: .bold))
                     .foregroundColor(.primary)
                 

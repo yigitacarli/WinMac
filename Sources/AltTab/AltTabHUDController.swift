@@ -47,12 +47,19 @@ public final class AltTabHUDController {
         startLocalKeyMonitoring()
     }
     
-    public func hide() {
+    public func hide(immediately: Bool = false) {
         stopLocalKeyMonitoring()
         guard let panel = panel, panel.isVisible else { return }
         
+        if immediately {
+            panel.alphaValue = 0.0
+            panel.orderOut(nil)
+            AltTabState.shared.isVisible = false
+            return
+        }
+        
         NSAnimationContext.runAnimationGroup { context in
-            context.duration = 0.12
+            context.duration = 0.08
             panel.animator().alphaValue = 0.0
         } completionHandler: {
             Task { @MainActor in

@@ -1,6 +1,7 @@
 import Carbon
 import Cocoa
 
+@MainActor
 public final class HotKeyManager: @unchecked Sendable {
     public static let shared = HotKeyManager()
     
@@ -16,7 +17,7 @@ public final class HotKeyManager: @unchecked Sendable {
         var eventType = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
         
         InstallEventHandler(
-            GetApplicationEventTarget(),
+            GetEventDispatcherTarget(),
             { (handlerCallRef, eventRef, userData) -> OSStatus in
                 var hotKeyID = EventHotKeyID()
                 let status = GetEventParameter(
@@ -41,28 +42,35 @@ public final class HotKeyManager: @unchecked Sendable {
         )
         
         registerHotKeys()
-        print("[WinMac] Carbon HotKeyManager registered successfully.")
+        print("[WinMac] Carbon HotKeyManager registered successfully with GetEventDispatcherTarget.")
     }
     
     public func registerHotKeys() {
         unregisterAll()
         
         let optCtrl = UInt32(optionKey | controlKey)
+        let cmdOpt = UInt32(cmdKey | optionKey)
         let optCtrlCmd = UInt32(optionKey | controlKey | cmdKey)
         
         // 1. Left Arrow (123)
         register(id: 1, keyCode: 123, modifiers: optCtrl)
+        register(id: 1, keyCode: 123, modifiers: cmdOpt)
         // 2. Right Arrow (124)
         register(id: 2, keyCode: 124, modifiers: optCtrl)
+        register(id: 2, keyCode: 124, modifiers: cmdOpt)
         // 3. Up Arrow (126)
         register(id: 3, keyCode: 126, modifiers: optCtrl)
+        register(id: 3, keyCode: 126, modifiers: cmdOpt)
         // 4. Down Arrow (125)
         register(id: 4, keyCode: 125, modifiers: optCtrl)
+        register(id: 4, keyCode: 125, modifiers: cmdOpt)
         
         // 5. Return / Maximize (36)
         register(id: 5, keyCode: 36, modifiers: optCtrl)
+        register(id: 5, keyCode: 36, modifiers: cmdOpt)
         // 6. C / Center (8)
         register(id: 6, keyCode: 8, modifiers: optCtrl)
+        register(id: 6, keyCode: 8, modifiers: cmdOpt)
         
         // 7. Quarters: U (32), I (34), J (38), K (40)
         register(id: 7, keyCode: 32, modifiers: optCtrl)
@@ -89,7 +97,7 @@ public final class HotKeyManager: @unchecked Sendable {
     private func register(id: UInt32, keyCode: UInt32, modifiers: UInt32) {
         var hotKeyRef: EventHotKeyRef?
         let hotKeyID = EventHotKeyID(signature: OSType(0x57494E4D), id: id) // 'WINM'
-        let status = RegisterEventHotKey(keyCode, modifiers, hotKeyID, GetApplicationEventTarget(), 0, &hotKeyRef)
+        let status = RegisterEventHotKey(keyCode, modifiers, hotKeyID, GetEventDispatcherTarget(), 0, &hotKeyRef)
         if status == noErr, let ref = hotKeyRef {
             hotKeyRefs.append(ref)
         }

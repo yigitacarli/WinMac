@@ -35,11 +35,17 @@ public enum SwitcherDisplayMode: String, CaseIterable, Identifiable, Codable, Se
 }
 
 public enum AltTabShortcut: String, CaseIterable, Identifiable, Codable, Sendable {
-    case optionTab = "Option + Tab (Alt + Tab)"
-    case cmdTab = "Command + Tab"
-    case ctrlTab = "Control + Tab"
+    case optionTab = "Option + Tab (⌥ + Tab)"
+    case ctrlTab = "Control + Tab (⌃ + Tab)"
     
     public var id: String { rawValue }
+    
+    public var title: String {
+        switch self {
+        case .optionTab: return "Option + Tab (Alt + Tab)"
+        case .ctrlTab: return "Control + Tab (⌃ + Tab)"
+        }
+    }
 }
 
 @MainActor
@@ -118,6 +124,9 @@ public final class AppSettings: ObservableObject {
     @Published public var optionFastScrollEnabled: Bool {
         didSet { defaults.set(optionFastScrollEnabled, forKey: "optionFastScrollEnabled") }
     }
+    @Published public var mousePointerSensitivity: Double {
+        didSet { defaults.set(mousePointerSensitivity, forKey: "mousePointerSensitivity") }
+    }
     @Published public var ctrlSlowScrollEnabled: Bool {
         didSet { defaults.set(ctrlSlowScrollEnabled, forKey: "ctrlSlowScrollEnabled") }
     }
@@ -130,18 +139,7 @@ public final class AppSettings: ObservableObject {
         didSet { defaults.set(excludedAppsForCtrl, forKey: "excludedAppsForCtrl") }
     }
     
-    // MARK: - Finder Settings
-    @Published public var finderEnterToOpen: Bool {
-        didSet { defaults.set(finderEnterToOpen, forKey: "finderEnterToOpen") }
-    }
-    @Published public var finderF2ToRename: Bool {
-        didSet { defaults.set(finderF2ToRename, forKey: "finderF2ToRename") }
-    }
-    @Published public var finderDeleteToTrash: Bool {
-        didSet { defaults.set(finderDeleteToTrash, forKey: "finderDeleteToTrash") }
-    }
-    
-    // MARK: - Clipboard History (Win + V)
+    // MARK: - Clipboard History
     @Published public var clipboardHistoryEnabled: Bool {
         didSet { defaults.set(clipboardHistoryEnabled, forKey: "clipboardHistoryEnabled") }
     }
@@ -211,6 +209,7 @@ public final class AppSettings: ObservableObject {
         self.cmdZoomScrollEnabled = defaults.object(forKey: "cmdZoomScrollEnabled") as? Bool ?? true
         self.optionFastScrollEnabled = defaults.object(forKey: "optionFastScrollEnabled") as? Bool ?? true
         self.ctrlSlowScrollEnabled = defaults.object(forKey: "ctrlSlowScrollEnabled") as? Bool ?? true
+        self.mousePointerSensitivity = defaults.object(forKey: "mousePointerSensitivity") as? Double ?? 1.0
         
         self.ctrlToCmdRemapEnabled = defaults.object(forKey: "ctrlToCmdRemapEnabled") as? Bool ?? true
         self.excludedAppsForCtrl = defaults.stringArray(forKey: "excludedAppsForCtrl") ?? [
@@ -221,10 +220,6 @@ public final class AppSettings: ObservableObject {
             "com.microsoft.VSCode",
             "com.jetbrains.intellij"
         ]
-        
-        self.finderEnterToOpen = defaults.object(forKey: "finderEnterToOpen") as? Bool ?? true
-        self.finderF2ToRename = defaults.object(forKey: "finderF2ToRename") as? Bool ?? true
-        self.finderDeleteToTrash = defaults.object(forKey: "finderDeleteToTrash") as? Bool ?? true
         
         self.clipboardHistoryEnabled = defaults.object(forKey: "clipboardHistoryEnabled") as? Bool ?? true
         self.maxClipboardItems = defaults.object(forKey: "maxClipboardItems") as? Int ?? 50

@@ -27,6 +27,20 @@ public final class CtrlToCmdMapper: @unchecked Sendable {
         let isEnabled = defaults.object(forKey: "ctrlToCmdRemapEnabled") as? Bool ?? true
         guard isEnabled else { return event }
         
+        // Don't intercept in terminal apps
+        if let frontApp = NSWorkspace.shared.frontmostApplication,
+           let bundleId = frontApp.bundleIdentifier {
+            let excluded = defaults.stringArray(forKey: "excludedAppsForCtrl") ?? [
+                "com.apple.Terminal",
+                "com.googlecode.iterm2",
+                "net.kovidgoyal.kitty",
+                "com.github.wez.wezterm"
+            ]
+            if excluded.contains(bundleId) {
+                return event
+            }
+        }
+        
         let flags = event.flags
         guard flags.contains(.maskControl) && !flags.contains(.maskCommand) else {
             return event
@@ -45,6 +59,29 @@ public final class CtrlToCmdMapper: @unchecked Sendable {
             }
         }
         
+        // Special case: Windows Ctrl+Y -> macOS Redo (Cmd + Shift + Z)
+        if keyCode == 16 { // Y key
+            var newFlags = flags
+            newFlags.remove(.maskControl)
+            newFlags.insert(.maskCommand)
+            newFlags.insert(.maskShift)
+            
+            event.setIntegerValueField(.keyboardEventKeycode, value: Int64(6)) // Z keycode
+            event.flags = newFlags
+            return event
+        }
+        
+        // Special case: Windows Ctrl+Shift+Z -> macOS Redo (Cmd + Shift + Z)
+        if keyCode == 6 && flags.contains(.maskShift) { // Z key + Shift
+            var newFlags = flags
+            newFlags.remove(.maskControl)
+            newFlags.insert(.maskCommand)
+            newFlags.insert(.maskShift)
+            event.flags = newFlags
+            return event
+        }
+        
+        // Standard Ctrl -> Cmd remapping (Ctrl+Z, Ctrl+C, Ctrl+V, Ctrl+A, Ctrl+X, etc.)
         if targetKeyCodes.contains(keyCode) {
             var newFlags = flags
             newFlags.remove(.maskControl)

@@ -60,10 +60,11 @@ public final class AltTabState: ObservableObject {
     }
     
     public func confirmSelection() {
-        if let target = selectedWindow {
+        let target = selectedWindow
+        dismiss()
+        if let target = target {
             WindowEngine.shared.focusWindow(target)
         }
-        dismiss()
     }
     
     public func dismiss() {

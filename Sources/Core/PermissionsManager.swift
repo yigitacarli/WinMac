@@ -27,7 +27,7 @@ public final class PermissionsManager: ObservableObject {
     }
     
     private func startPolling() {
-        timer = Timer.scheduledTimer(withTimeInterval: 1.5, repeats: true) { [weak self] _ in
+        timer = Timer.scheduledTimer(withTimeInterval: 0.8, repeats: true) { [weak self] _ in
             Task { @MainActor in
                 self?.checkPermissions()
             }
@@ -37,10 +37,12 @@ public final class PermissionsManager: ObservableObject {
     public func requestAccessibilityPermission() {
         let key = "AXTrustedCheckOptionPrompt" as CFString
         let options = [key: true] as CFDictionary
-        AXIsProcessTrustedWithOptions(options)
+        let trusted = AXIsProcessTrustedWithOptions(options)
+        self.hasAccessibilityPermission = trusted
     }
     
     public func openAccessibilitySettings() {
+        requestAccessibilityPermission()
         if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
             NSWorkspace.shared.open(url)
         }

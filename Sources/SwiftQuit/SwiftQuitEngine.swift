@@ -8,7 +8,7 @@ public final class SwiftQuitEngine {
     private var timer: Timer?
     private var isRunning: Bool = false
     
-    // System apps that should never be terminated
+    // System apps that should never be auto-terminated
     private let systemExcludedBundleIDs: Set<String> = [
         "com.apple.finder",
         "com.apple.dock",
@@ -17,6 +17,8 @@ public final class SwiftQuitEngine {
         "com.apple.notificationcenterui",
         "com.apple.Spotlight",
         "com.apple.SystemSettings",
+        "com.apple.Music",
+        "com.apple.mail",
         "com.winmac.app"
     ]
     
@@ -26,7 +28,6 @@ public final class SwiftQuitEngine {
         guard !isRunning else { return }
         isRunning = true
         
-        // Listen to workspace application state changes
         NSWorkspace.shared.notificationCenter.addObserver(
             self,
             selector: #selector(handleAppDeactivated(_:)),
@@ -34,14 +35,14 @@ public final class SwiftQuitEngine {
             object: nil
         )
         
-        // Lightweight 1.5s check for apps with 0 windows
+        // Periodic check for apps with 0 windows
         timer = Timer.scheduledTimer(withTimeInterval: 1.5, repeats: true) { [weak self] _ in
             Task { @MainActor in
                 self?.checkRunningApplications()
             }
         }
         
-        print("[WinMac] SwiftQuitEngine started.")
+        print("[WinMac] AutoQuitEngine started.")
     }
     
     public func stop() {
@@ -79,47 +80,60 @@ public final class SwiftQuitEngine {
         guard let bundleID = app.bundleIdentifier else { return }
         guard !systemExcludedBundleIDs.contains(bundleID) else { return }
         
-        // Check user exclusions
+        // User custom exclusions
         let userExclusions = AppSettings.shared.swiftQuitExcludedApps
         guard !userExclusions.contains(bundleID) else { return }
         
-        // Check if app has any visible windows via AXUIElement
+        // If app is hidden (Cmd+H), user intends to keep it alive in background
+        if app.isHidden {
+            return
+        }
+        
         let appElement = AXUIElementCreateApplication(app.processIdentifier)
         var windowsVal: AnyObject?
         let result = AXUIElementCopyAttributeValue(appElement, kAXWindowsAttribute as CFString, &windowsVal)
         
-        if result == .success {
-            if let windowsList = windowsVal as? [AXUIElement] {
-                // Filter out sheets or zero-sized hidden windows
-                var visibleWindowCount = 0
-                for win in windowsList {
-                    var minVal: AnyObject?
-                    var sizeVal: AnyObject?
-                    AXUIElementCopyAttributeValue(win, kAXMinimizedAttribute as CFString, &minVal)
-                    AXUIElementCopyAttributeValue(win, kAXSizeAttribute as CFString, &sizeVal)
-                    
-                    let isMinimized = (minVal as? Bool) ?? false
-                    if !isMinimized {
-                        if let sVal = sizeVal {
-                            var size = CGSize.zero
-                            AXValueGetValue(sVal as! AXValue, .cgSize, &size)
-                            if size.width > 50 && size.height > 50 {
-                                visibleWindowCount += 1
-                            }
-                        } else {
-                            visibleWindowCount += 1
-                        }
-                    }
+        if result == .success, let windowsList = windowsVal as? [AXUIElement] {
+            // Count genuine windows and check if any window is minimized into Dock
+            var hasMinimizedWindows = false
+            var activeWindowCount = 0
+            
+            for win in windowsList {
+                var minVal: AnyObject?
+                var sizeVal: AnyObject?
+                
+                AXUIElementCopyAttributeValue(win, kAXMinimizedAttribute as CFString, &minVal)
+                AXUIElementCopyAttributeValue(win, kAXSizeAttribute as CFString, &sizeVal)
+                
+                let isMin = (minVal as? Bool) ?? false
+                if isMin {
+                    hasMinimizedWindows = true
                 }
                 
-                if visibleWindowCount == 0 {
-                    let delay = AppSettings.shared.swiftQuitDelaySeconds
-                    if delay <= 0 {
-                        terminateApp(app)
-                    } else {
-                        DispatchQueue.main.asyncAfter(deadline: .now() + Double(delay)) { [weak self] in
-                            self?.revalidateAndTerminate(app)
-                        }
+                var size = CGSize.zero
+                if let s = sizeVal {
+                    AXValueGetValue(s as! AXValue, .cgSize, &size)
+                }
+                
+                // Real window on screen
+                if size.width > 60 && size.height > 60 {
+                    activeWindowCount += 1
+                }
+            }
+            
+            // If the user minimized a window to Dock, DO NOT terminate the app!
+            if hasMinimizedWindows {
+                return
+            }
+            
+            // Only quit if the app has ZERO open windows (all closed with 'X')
+            if activeWindowCount == 0 && windowsList.isEmpty {
+                let delay = AppSettings.shared.swiftQuitDelaySeconds
+                if delay <= 0 {
+                    terminateApp(app)
+                } else {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + Double(delay)) { [weak self] in
+                        self?.revalidateAndTerminate(app)
                     }
                 }
             }
@@ -127,7 +141,7 @@ public final class SwiftQuitEngine {
     }
     
     private func revalidateAndTerminate(_ app: NSRunningApplication) {
-        guard !app.isTerminated else { return }
+        guard !app.isTerminated, !app.isHidden else { return }
         let appElement = AXUIElementCreateApplication(app.processIdentifier)
         var windowsVal: AnyObject?
         if AXUIElementCopyAttributeValue(appElement, kAXWindowsAttribute as CFString, &windowsVal) == .success,
@@ -137,7 +151,7 @@ public final class SwiftQuitEngine {
     }
     
     private func terminateApp(_ app: NSRunningApplication) {
-        print("[WinMac SwiftQuit] Auto-terminating application: \(app.localizedName ?? app.bundleIdentifier ?? "")")
+        print("[WinMac AutoQuit] Closing application with 0 open windows: \(app.localizedName ?? app.bundleIdentifier ?? "")")
         app.terminate()
     }
 }

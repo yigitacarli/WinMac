@@ -61,7 +61,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
     private func updateStatusMenu() {
         let menu = NSMenu()
         
-        let titleItem = NSMenuItem(title: "WinMac (Alt + Tab & Superpowers)", action: nil, keyEquivalent: "")
+        let titleItem = NSMenuItem(title: "WinMac — macOS Toolkit", action: nil, keyEquivalent: "")
         titleItem.isEnabled = false
         menu.addItem(titleItem)
         menu.addItem(NSMenuItem.separator())
@@ -78,23 +78,15 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         
         let altTabItem = NSMenuItem(
-            title: "Alt + Tab Pencere Değiştirici: \(AppSettings.shared.altTabEnabled ? "Açık" : "Kapalı")",
+            title: "Pencere Değiştirici: \(AppSettings.shared.altTabEnabled ? "Açık" : "Kapalı")",
             action: #selector(toggleAltTab),
             keyEquivalent: ""
         )
         altTabItem.target = self
         menu.addItem(altTabItem)
         
-        let mouseScrollItem = NSMenuItem(
-            title: "Ters Fare Tekerleği: \(AppSettings.shared.invertMouseWheel ? "Açık" : "Kapalı")",
-            action: #selector(toggleMouseScroll),
-            keyEquivalent: ""
-        )
-        mouseScrollItem.target = self
-        menu.addItem(mouseScrollItem)
-        
         let snapItem = NSMenuItem(
-            title: "Pencere Yaslama (Rectangle Pro): \(AppSettings.shared.snapShortcutsEnabled ? "Açık" : "Kapalı")",
+            title: "Pencere Yaslama: \(AppSettings.shared.snapShortcutsEnabled ? "Açık" : "Kapalı")",
             action: #selector(toggleSnap),
             keyEquivalent: ""
         )
@@ -102,15 +94,23 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(snapItem)
         
         let quitEngineItem = NSMenuItem(
-            title: "X ile Uygulamayı Kapat (SwiftQuit): \(AppSettings.shared.swiftQuitEnabled ? "Açık" : "Kapalı")",
+            title: "Otomatik Çıkış (X İle Kapat): \(AppSettings.shared.swiftQuitEnabled ? "Açık" : "Kapalı")",
             action: #selector(toggleSwiftQuit),
             keyEquivalent: ""
         )
         quitEngineItem.target = self
         menu.addItem(quitEngineItem)
         
+        let mouseScrollItem = NSMenuItem(
+            title: "Standart Fare Tekerleği: \(AppSettings.shared.invertMouseWheel ? "Açık" : "Kapalı")",
+            action: #selector(toggleMouseScroll),
+            keyEquivalent: ""
+        )
+        mouseScrollItem.target = self
+        menu.addItem(mouseScrollItem)
+        
         let ctrlCmdItem = NSMenuItem(
-            title: "Ctrl -> Cmd Çevirici: \(AppSettings.shared.ctrlToCmdRemapEnabled ? "Açık" : "Kapalı")",
+            title: "Klavye Kısayolları (Ctrl->Cmd): \(AppSettings.shared.ctrlToCmdRemapEnabled ? "Açık" : "Kapalı")",
             action: #selector(toggleCtrlCmd),
             keyEquivalent: ""
         )
@@ -118,7 +118,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(ctrlCmdItem)
         
         let clipItem = NSMenuItem(
-            title: "Win + V Pano Geçmişi: \(AppSettings.shared.clipboardHistoryEnabled ? "Açık" : "Kapalı")",
+            title: "Pano Geçmişi (Option + V): \(AppSettings.shared.clipboardHistoryEnabled ? "Açık" : "Kapalı")",
             action: #selector(toggleClipboard),
             keyEquivalent: ""
         )

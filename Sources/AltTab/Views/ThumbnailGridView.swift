@@ -103,31 +103,31 @@ private struct ThumbnailCard: View {
             .frame(maxWidth: .infinity, minHeight: 110)
             .background(Color.black.opacity(0.15))
         }
-        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         .background(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .fill(
                     isSelected
-                        ? AnyShapeStyle(LinearGradient(colors: [Color.blue.opacity(0.35), Color.blue.opacity(0.18)], startPoint: .top, endPoint: .bottom))
-                        : AnyShapeStyle(Color.white.opacity(0.05))
+                        ? Color.accentColor.opacity(0.22)
+                        : Color.white.opacity(0.06)
                 )
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .stroke(
                     isSelected
-                        ? LinearGradient(colors: [Color.blue.opacity(0.95), Color.cyan.opacity(0.7)], startPoint: .topLeading, endPoint: .bottomTrailing)
-                        : LinearGradient(colors: [Color.white.opacity(0.12), Color.white.opacity(0.05)], startPoint: .top, endPoint: .bottom),
-                    lineWidth: isSelected ? 2 : 1
+                        ? Color.accentColor.opacity(0.8)
+                        : Color.white.opacity(0.1),
+                    lineWidth: isSelected ? 1.5 : 1
                 )
         )
         .shadow(
-            color: isSelected ? Color.blue.opacity(0.4) : Color.black.opacity(0.2),
-            radius: isSelected ? 12 : 6,
-            y: isSelected ? 4 : 2
+            color: isSelected ? Color.accentColor.opacity(0.3) : Color.black.opacity(0.15),
+            radius: isSelected ? 8 : 3,
+            y: isSelected ? 3 : 1
         )
         .scaleEffect(isSelected ? 1.02 : 1.0)
-        .animation(.spring(response: 0.22, dampingFraction: 0.72), value: isSelected)
+        .animation(.spring(response: 0.18, dampingFraction: 0.8), value: isSelected)
         .onTapGesture {
             onTap()
         }

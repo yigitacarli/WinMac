@@ -8,17 +8,26 @@
 ## 📌 Proje Özeti & Vizyon
 - **Proje Adı:** WinMac
 - **Amaç:** 
-  1. `AltTab macOS` uygulamasının son sürümlerinde **Pro** abonelik arkasına aldığı tüm özellikleri (canlı arama, 3 farklı görünüm modu, kısayollar) **%100 ücretsiz, açık kaynak ve reklamsız** sunmak.
-  2. `Rectangle Pro` pencere yaslama (Aero Snap, Drag-to-Snap Ghost Overlay, Cycle Fractions 1/2 -> 2/3 -> 1/3, Window Gaps, Resize) özelliklerini Carbon Hotkeys ile 0ms gecikmeli sunmak.
-  3. `LinearMouse Pro` (bağımsız dikey/yatay ters kaydırma, Cmd+Tekerlek Yakınlaştırma, Shift+Tekerlek yatay kaydırma, Option+Tekerlek 3x hızlı kaydırma, Ctrl+Tekerlek hassas kaydırma, ivme sıfırlama) özelliklerini entegre etmek.
-  4. `SwiftQuit` motoru ile Mac'te sol üstteki kırmızı 'X' butonuna basılıp son pencere kapandığında uygulamanın Windows'taki gibi **otomatik olarak tamamen sonlanmasını (Quit)** sağlamak.
-  5. Windows'tan macOS'e geçen kullanıcıların tüm kronik alışkanlıklarını (`Ctrl+C/V`, Finder `Enter`/`F2`/`Delete`, `Win+V` Pano Geçmişi, `Win+L` Kilit) tek pakette çözmek.
+  1. **Pencere Değiştirici (Window Switcher):** Canlı arama, 3 farklı görünüm modu, özelleştirilebilir kısayollar (Option+Tab & Control+Tab) ve 0ms gecikmeli pencere odaklama.
+  2. **Pencere Yaslama & Düzenleme (Window Snapping):** Ekran kenarlarına sürükleyerek (Aero Snap) veya global Carbon kısayollarıyla pencereleri 1/2, 2/3, 1/3, çeyrek veya tam ekran hizalama, pencere boşlukları (gaps).
+  3. **Fare & Kaydırma Denetimi (Mouse & Scroll Engine):** Bağımsız standart fare tekerleği, yatay ters kaydırma, Cmd+Tekerlek Yakınlaştırma (Zoom), Shift+Tekerlek yatay kaydırma, Option+Tekerlek 3x hızlı kaydırma, Control+Tekerlek 0.3x hassas kaydırma ve 1:1 doğrusal ivme kontrolü.
+  4. **Otomatik Çıkış Motoru (Auto-Quit on Close):** Mac'te sol üstteki kırmızı 'X' butonuna basılıp son pencere kapandığında uygulamanın arka planda gereksiz bellek tüketmesini engelleyerek otomatik olarak sonlanmasını sağlamak (Sarı - minimize ve Cmd+H gizleme korumalı).
+  5. **Klavye Kısayolları & Pano:** Evrensel `Ctrl+C/V/Z/Y/A`, `Option+L` Ekran Kilidi, `Ctrl+Shift+Esc` Etkinlik Monitörü ve `Option+V` Pano Geçmişi.
 
 ---
 
 ## 📝 Sürüm Geçmişi (Changelog)
 
-### Sürüm 3.1.0 (Güncel)
+### Sürüm 3.7.0 (Güncel)
+- **Masaüstünü Göster ("Masaüstü" Kartı):** Pencere listesindeki boş Finder girdisi kaldırıldı; yerine tüm pencereleri anında gizleyip masaüstünü ön plana getiren özel "Masaüstü" aksiyonu eklendi.
+- **WinMac Kendi Penceresini Yaslama:** `SnapEngine.swift` içerisindeki hedef uygulama arama mantığı düzeltilerek WinMac ayarlar penceresinin de kısayollarla ve sürüklemeyle anında yaslanabilmesi sağlandı.
+- **Yeniden Tasarlanan Akıcı Arayüz:** Sabit pencere boyutları kaldırıldı, modern üst kapsül sekme çubuğu ve dinamik `LazyVGrid` adaptif kart yapısı eklendi.
+- **Doğrudan Fare Motoru:** `ScrollInverter.swift` ve `EventTapManager.swift` içerisindeki event tap yapısı güvenli hale getirilerek tüm harici farelerde bağımsız yön, hız, hassasiyet ve tuş modifikatörleri kesintisiz çalışır kılındı.
+- **Sade Dokümantasyon:** `README.md` ve arayüz metinlerindeki jenerik AI ifadeleri temizlendi, sade ve doğrudan bir dil benimsendi.
+
+### Sürüm 3.3.0
+
+### Sürüm 3.1.0
 - **SwiftQuit Entegrasyonu (`SwiftQuitEngine.swift`):** Bir uygulamanın son penceresi kırmızı 'X' ile kapatıldığında, uygulamanın arka planda asılı kalmasını engelleyip Windows tarzı otomatik olarak tamamen kapanmasını (Quit) sağlayan motor eklendi. Gecikme süresi (0s, 1s, 2s) ve koruma listesi ayarları eklendi.
 - **Carbon HotKey Mimarisi (`HotKeyManager.swift`):** Rectangle kısayolları için macOS çekirdek seviyesi `RegisterEventHotKey` sistemi entegre edildi.
 - **LinearMouse `.cgSessionEventTap` Mimarisi:** Fare dinleme ve modifikatör motoru kullanıcı oturumu seviyesine taşınarak EventTap kilitlenmeleri çözüldü.
@@ -73,9 +82,8 @@ hopeful-lovelace/
     ├── MouseScroll/
     │   └── ScrollInverter.swift      # LinearMouse Pro: Ters kaydırma, Zoom, Shift/Opt/Ctrl modifikatörleri
     ├── KeyboardBridge/
-    │   ├── CtrlToCmdMapper.swift     # Ctrl+C/V/Z/A/S/F/W/T -> Cmd dönüştürücü
-    │   ├── FinderBridge.swift        # Finder: Enter ile aç, F2 yeniden adlandır, Delete çöpe at
-    │   └── SystemShortcuts.swift     # Win+L (Kilit), Ctrl+Shift+Esc (Etkinlik Monitörü)
+    │   ├── CtrlToCmdMapper.swift     # Ctrl+C/V/Z/Y/A/S/F/W/T/P/N/R -> Cmd dönüştürücü
+    │   └── SystemShortcuts.swift     # Option+L (Kilit), Ctrl+Shift+Esc (Etkinlik Monitörü)
     ├── Clipboard/
     │   ├── ClipboardItem.swift       # Pano kayıt modeli
     │   ├── ClipboardManager.swift    # NSPasteboard dinleyici ve hafıza

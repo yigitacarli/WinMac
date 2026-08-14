@@ -67,29 +67,24 @@ private struct TitleListRow: View {
             Spacer()
         }
         .padding(.horizontal, 14)
-        .padding(.vertical, 10)
+        .padding(.vertical, 8)
         .background(
-            ZStack {
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(
-                        isSelected
-                            ? AnyShapeStyle(LinearGradient(colors: [Color.blue.opacity(0.45), Color.blue.opacity(0.25)], startPoint: .leading, endPoint: .trailing))
-                            : AnyShapeStyle(Color.white.opacity(0.04))
-                    )
-                
-                if isSelected {
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .stroke(
-                            LinearGradient(colors: [Color.blue.opacity(0.8), Color.cyan.opacity(0.6)], startPoint: .leading, endPoint: .trailing),
-                            lineWidth: 1.5
-                        )
-                } else {
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .stroke(Color.white.opacity(0.08), lineWidth: 1)
-                }
-            }
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(
+                    isSelected
+                        ? Color.accentColor.opacity(0.25)
+                        : Color.white.opacity(0.04)
+                )
         )
-        .shadow(color: isSelected ? Color.blue.opacity(0.3) : Color.clear, radius: 6, y: 2)
+        .overlay(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .stroke(
+                    isSelected
+                        ? Color.accentColor.opacity(0.8)
+                        : Color.white.opacity(0.06),
+                    lineWidth: 1
+                )
+        )
         .onTapGesture(perform: onTap)
         .onHover(perform: onHover)
     }

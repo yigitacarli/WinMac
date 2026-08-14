@@ -72,7 +72,8 @@ public final class WindowEngine {
                     )
                     result.append(model)
                 }
-            } else {
+            } else if app.bundleIdentifier != "com.apple.finder" {
+                // Only add windowless entries for non-Finder apps if needed
                 let model = WindowModel(
                     id: CGWindowID(UInt32(pid) << 8),
                     pid: pid,
@@ -102,30 +103,67 @@ public final class WindowEngine {
             }
         }
         
+        // Add special "Masaüstü" (Show Desktop) card at the end
+        let desktopModel = WindowModel(
+            id: 999999,
+            pid: 0,
+            appName: "Masaüstü",
+            bundleId: "com.apple.desktop",
+            appIcon: NSImage(systemSymbolName: "desktopcomputer", accessibilityDescription: "Masaüstü"),
+            title: "Masaüstünü Göster",
+            bounds: .zero,
+            isMinimized: false,
+            isHidden: false,
+            thumbnail: nil
+        )
+        result.append(desktopModel)
+        
         return result
     }
     
     // MARK: - Window Focus & Control
     public func focusWindow(_ window: WindowModel) {
+        // Special Desktop Action
+        if window.bundleId == "com.apple.desktop" || window.pid == 0 {
+            for runningApp in NSWorkspace.shared.runningApplications {
+                if runningApp.activationPolicy == .regular && runningApp.bundleIdentifier != "com.apple.finder" {
+                    runningApp.hide()
+                }
+            }
+            if let finder = NSWorkspace.shared.runningApplications.first(where: { $0.bundleIdentifier == "com.apple.finder" }) {
+                finder.activate(options: [.activateAllWindows])
+            }
+            return
+        }
+        
         guard let app = NSRunningApplication(processIdentifier: window.pid) else { return }
         
+        // 1. Unhide if hidden
         if app.isHidden {
             app.unhide()
         }
         
-        app.activate(options: [.activateIgnoringOtherApps])
+        // 2. Yield activation on macOS 14+ and activate target application
+        if #available(macOS 14.0, *) {
+            NSApp.yieldActivation(to: app)
+        }
+        app.activate(options: [.activateAllWindows])
         
+        // 3. Accessibility level raise and focus
         let appElement = AXUIElementCreateApplication(window.pid)
+        AXUIElementSetAttributeValue(appElement, kAXFrontmostAttribute as CFString, kCFBooleanTrue)
+        
         var windowListValue: AnyObject?
         let result = AXUIElementCopyAttributeValue(appElement, kAXWindowsAttribute as CFString, &windowListValue)
         
-        if result == .success, let axWindows = windowListValue as? [AXUIElement] {
+        if result == .success, let axWindows = windowListValue as? [AXUIElement], !axWindows.isEmpty {
+            var targetFound = false
             for axWindow in axWindows {
                 var titleValue: AnyObject?
                 _ = AXUIElementCopyAttributeValue(axWindow, kAXTitleAttribute as CFString, &titleValue)
                 let title = (titleValue as? String) ?? ""
                 
-                if title == window.title || axWindows.count == 1 || window.title == window.appName {
+                if title == window.title || (window.title.isEmpty && title.isEmpty) {
                     var minVal: AnyObject?
                     if AXUIElementCopyAttributeValue(axWindow, kAXMinimizedAttribute as CFString, &minVal) == .success,
                        let isMin = minVal as? Bool, isMin {
@@ -133,11 +171,28 @@ public final class WindowEngine {
                     }
                     
                     AXUIElementSetAttributeValue(axWindow, kAXMainAttribute as CFString, kCFBooleanTrue)
+                    AXUIElementSetAttributeValue(axWindow, kAXFocusedAttribute as CFString, kCFBooleanTrue)
                     AXUIElementPerformAction(axWindow, kAXRaiseAction as CFString)
+                    targetFound = true
                     break
                 }
             }
+            
+            // Fallback if title didn't match exactly
+            if !targetFound, let firstWin = axWindows.first {
+                var minVal: AnyObject?
+                if AXUIElementCopyAttributeValue(firstWin, kAXMinimizedAttribute as CFString, &minVal) == .success,
+                   let isMin = minVal as? Bool, isMin {
+                    AXUIElementSetAttributeValue(firstWin, kAXMinimizedAttribute as CFString, kCFBooleanFalse)
+                }
+                AXUIElementSetAttributeValue(firstWin, kAXMainAttribute as CFString, kCFBooleanTrue)
+                AXUIElementSetAttributeValue(firstWin, kAXFocusedAttribute as CFString, kCFBooleanTrue)
+                AXUIElementPerformAction(firstWin, kAXRaiseAction as CFString)
+            }
         }
+        
+        // 4. Deactivate WinMac so target application is unconditionally in front
+        NSApp.deactivate()
     }
     
     public func closeWindow(_ window: WindowModel) {
