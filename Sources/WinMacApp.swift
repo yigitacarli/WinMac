@@ -23,11 +23,16 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
             }
             .store(in: &cancellables)
         
-        if !PermissionsManager.shared.allPermissionsGranted {
-            SettingsWindowController.shared.show()
-        }
+        // Open Settings window on launch and bring to front
+        SettingsWindowController.shared.show()
         
         print("[WinMac] Ready.")
+    }
+    
+    // When clicked from Launchpad, Applications folder, or Dock icon
+    public func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        SettingsWindowController.shared.show()
+        return true
     }
     
     private func setupStatusBar() {
@@ -103,7 +108,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(NSMenuItem.separator())
         
         let settingsItem = NSMenuItem(
-            title: "Ayarlar...",
+            title: "Ayarlar Penceresini Aç...",
             action: #selector(openSettings),
             keyEquivalent: ","
         )
