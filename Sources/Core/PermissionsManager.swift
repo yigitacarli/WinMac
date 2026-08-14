@@ -23,11 +23,18 @@ public final class PermissionsManager: ObservableObject {
         let trusted = AXIsProcessTrusted()
         if self.hasAccessibilityPermission != trusted {
             self.hasAccessibilityPermission = trusted
+            if trusted {
+                print("[WinMac] Accessibility permission granted. Starting services.")
+                EventTapManager.shared.start()
+            } else {
+                print("[WinMac] Accessibility permission revoked. Safely stopping services to prevent UI freeze.")
+                EventTapManager.shared.stop()
+            }
         }
     }
     
     private func startPolling() {
-        timer = Timer.scheduledTimer(withTimeInterval: 0.8, repeats: true) { [weak self] _ in
+        timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
             Task { @MainActor in
                 self?.checkPermissions()
             }

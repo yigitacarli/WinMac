@@ -18,12 +18,14 @@
 
 ## 📝 Sürüm Geçmişi (Changelog)
 
-### Sürüm 3.7.0 (Güncel)
-- **Masaüstünü Göster ("Masaüstü" Kartı):** Pencere listesindeki boş Finder girdisi kaldırıldı; yerine tüm pencereleri anında gizleyip masaüstünü ön plana getiren özel "Masaüstü" aksiyonu eklendi.
-- **WinMac Kendi Penceresini Yaslama:** `SnapEngine.swift` içerisindeki hedef uygulama arama mantığı düzeltilerek WinMac ayarlar penceresinin de kısayollarla ve sürüklemeyle anında yaslanabilmesi sağlandı.
-- **Yeniden Tasarlanan Akıcı Arayüz:** Sabit pencere boyutları kaldırıldı, modern üst kapsül sekme çubuğu ve dinamik `LazyVGrid` adaptif kart yapısı eklendi.
-- **Doğrudan Fare Motoru:** `ScrollInverter.swift` ve `EventTapManager.swift` içerisindeki event tap yapısı güvenli hale getirilerek tüm harici farelerde bağımsız yön, hız, hassasiyet ve tuş modifikatörleri kesintisiz çalışır kılındı.
-- **Sade Dokümantasyon:** `README.md` ve arayüz metinlerindeki jenerik AI ifadeleri temizlendi, sade ve doğrudan bir dil benimsendi.
+### Sürüm 3.8.0 (Güncel)
+- **Güvenli İzin Yönetimi & Kilitlenme Koruması:** Kullanıcı Sistem Ayarlarından WinMac'in erişilebilirlik iznini kaldırdığında veya yetki düştüğünde, `EventTapManager` hemen dinlemeyi durdurur (`stop()`). Sonsuz döngü ve macOS giriş kilitlenmesi (fare/klavye donması) tamamen önlendi.
+- **Spotify Auto-Quit Desteği:** `AppSettings.swift` içerisindeki varsayılan hariç tutma listesinden `com.spotify.client` kaldırıldı; Spotify kapatıldığında artık otomatik olarak sonlanır.
+- **Kaybolmayan Sarmal Sekme Menüsü:** Küçük veya dar pencerelerde yatayda taşan sekmeler yerine ekran genişliğine göre otomatik satırlara katlanan `LazyVGrid` sekme ızgarası uygulandı.
+- **LinearMouse Tabanlı Fare & Yakınlaştırma (Zoom) Motoru:** `Cmd+Tekerlek` ile `CGEventSource` üzerinden evrensel Zoom In / Zoom Out (`Cmd + +` / `Cmd + -`) sentezi, `Shift+Tekerlek` yatay kaydırma ve `-g com.apple.mouse.scaling` üzerinden sistem geneli imleç hassasiyeti tamamlandı.
+- **Gereksiz README.md Dosyası Kaldırıldı:** Kullanıcı talebi doğrultusunda `README.md` projeden silindi.
+
+### Sürüm 3.7.0
 
 ### Sürüm 3.3.0
 

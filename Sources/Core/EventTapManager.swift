@@ -1,6 +1,7 @@
 import CoreGraphics
 import Foundation
 import Cocoa
+import ApplicationServices
 
 public final class EventTapManager: @unchecked Sendable {
     public static let shared = EventTapManager()
@@ -21,6 +22,10 @@ public final class EventTapManager: @unchecked Sendable {
     
     public func start() {
         guard eventTap == nil else { return }
+        guard AXIsProcessTrusted() else {
+            print("[WinMac] Cannot start EventTap: Accessibility permission not granted.")
+            return
+        }
         
         // Start Carbon HotKeys for global window snapping on main thread
         DispatchQueue.main.async {
@@ -66,7 +71,7 @@ public final class EventTapManager: @unchecked Sendable {
         }
         
         guard let validTap = tap else {
-            print("[WinMac] Warning: Failed to create CGEventTap. Needs Accessibility permission.")
+            print("[WinMac] Warning: Failed to create CGEventTap.")
             return
         }
         
@@ -86,13 +91,22 @@ public final class EventTapManager: @unchecked Sendable {
                 runLoopSource = nil
             }
             eventTap = nil
+            print("[WinMac] EventTap stopped safely.")
         }
     }
     
     private func handleEvent(proxy: CGEventTapProxy, type: CGEventType, event: CGEvent) -> Unmanaged<CGEvent>? {
-        if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
-            if let tap = eventTap {
+        // Critical safety check: if user revoked permission, stop immediately to avoid UI deadlock
+        if type == .tapDisabledByUserInput {
+            self.stop()
+            return Unmanaged.passUnretained(event)
+        }
+        
+        if type == .tapDisabledByTimeout {
+            if AXIsProcessTrusted(), let tap = eventTap {
                 CGEvent.tapEnable(tap: tap, enable: true)
+            } else {
+                self.stop()
             }
             return Unmanaged.passUnretained(event)
         }

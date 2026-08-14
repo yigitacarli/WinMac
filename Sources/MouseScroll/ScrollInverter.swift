@@ -6,8 +6,8 @@ public final class ScrollInverter: @unchecked Sendable {
     public static let shared = ScrollInverter()
     
     private var lastZoomTime: TimeInterval = 0
-    private var mouseAccelerationApplied: Bool?
-    private var mouseScalingApplied: Double?
+    private var lastMouseScaling: Double?
+    private var lastLinearAccel: Bool?
     
     private init() {}
     
@@ -16,7 +16,6 @@ public final class ScrollInverter: @unchecked Sendable {
         let invertV = defaults.object(forKey: "invertMouseWheel") as? Bool ?? true
         let invertH = defaults.object(forKey: "invertHorizontalScroll") as? Bool ?? true
         var speedMult = defaults.object(forKey: "scrollSpeedMultiplier") as? Double ?? 1.0
-        let linesPerTick = defaults.object(forKey: "linesPerScrollTick") as? Int ?? 3
         
         let shiftH = defaults.object(forKey: "shiftHorizontalScrollEnabled") as? Bool ?? true
         let cmdZoom = defaults.object(forKey: "cmdZoomScrollEnabled") as? Bool ?? true
@@ -25,8 +24,8 @@ public final class ScrollInverter: @unchecked Sendable {
         let linearAccel = defaults.object(forKey: "disableMouseAcceleration") as? Bool ?? false
         let sensitivity = defaults.object(forKey: "mousePointerSensitivity") as? Double ?? 1.0
         
-        // Handle mouse acceleration and scaling
-        applyMouseSettings(linear: linearAccel, sensitivity: sensitivity)
+        // Apply system-level pointer settings
+        applySystemMouseSettings(linear: linearAccel, sensitivity: sensitivity)
         
         let flags = event.flags
         var deltaY = Double(event.getIntegerValueField(.scrollWheelEventDeltaAxis1))
@@ -51,15 +50,23 @@ public final class ScrollInverter: @unchecked Sendable {
             fixedDeltaX = deltaX * 10.0
         }
         
-        // 1. Cmd + Wheel -> Zoom In / Zoom Out
+        // 1. Cmd + Wheel -> Zoom In / Zoom Out (Cmd + + / Cmd + -)
         if flags.contains(.maskCommand) && cmdZoom && (deltaY != 0 || pointDeltaY != 0) {
             let now = ProcessInfo.processInfo.systemUptime
             if now - lastZoomTime > 0.08 {
                 lastZoomTime = now
-                let isZoomIn = (deltaY != 0 ? deltaY > 0 : pointDeltaY > 0)
-                let zoomIn = invertV ? !isZoomIn : isZoomIn
-                DispatchQueue.main.async {
-                    SystemUtils.sendKeystroke(keyCode: zoomIn ? 24 : 27, flags: .maskCommand)
+                let isUp = (deltaY != 0 ? deltaY > 0 : pointDeltaY > 0)
+                let zoomIn = invertV ? !isUp : isUp
+                
+                // Key 24 is '+', Key 27 is '-'
+                let keyCode: CGKeyCode = zoomIn ? 24 : 27
+                let source = CGEventSource(stateID: .hidSystemState)
+                if let keyDown = CGEvent(keyboardEventSource: source, virtualKey: keyCode, keyDown: true),
+                   let keyUp = CGEvent(keyboardEventSource: source, virtualKey: keyCode, keyDown: false) {
+                    keyDown.flags = .maskCommand
+                    keyUp.flags = .maskCommand
+                    keyDown.post(tap: .cgSessionEventTap)
+                    keyUp.post(tap: .cgSessionEventTap)
                 }
             }
             return nil
@@ -70,16 +77,12 @@ public final class ScrollInverter: @unchecked Sendable {
             speedMult *= 3.0
         }
         
-        // 3. Control + Wheel -> 0.3x Slow Precision Scroll
+        // 3. Control + Wheel -> 0.3x Precision Slow Scroll
         if flags.contains(.maskControl) && ctrlSlow {
             speedMult *= 0.3
         }
         
-        // 4. Lines per tick factor
-        let lineFactor = Double(linesPerTick) / 3.0
-        speedMult *= lineFactor
-        
-        // Invert Vertical Scroll
+        // Invert Vertical Scroll (Standard Direction)
         if invertV {
             deltaY = -deltaY
             pointDeltaY = -pointDeltaY
@@ -103,7 +106,7 @@ public final class ScrollInverter: @unchecked Sendable {
             fixedDeltaX *= speedMult
         }
         
-        // Shift + Wheel -> Horizontal Scroll
+        // 4. Shift + Wheel -> Horizontal Scroll
         if flags.contains(.maskShift) && shiftH && (deltaY != 0 || pointDeltaY != 0) {
             event.setIntegerValueField(.scrollWheelEventDeltaAxis1, value: 0)
             event.setIntegerValueField(.scrollWheelEventPointDeltaAxis1, value: 0)
@@ -115,6 +118,7 @@ public final class ScrollInverter: @unchecked Sendable {
             return event
         }
         
+        // Write transformed values directly back to CGEvent
         event.setIntegerValueField(.scrollWheelEventDeltaAxis1, value: Int64(deltaY))
         event.setIntegerValueField(.scrollWheelEventPointDeltaAxis1, value: Int64(pointDeltaY))
         event.setDoubleValueField(.scrollWheelEventFixedPtDeltaAxis1, value: fixedDeltaY)
@@ -142,16 +146,17 @@ public final class ScrollInverter: @unchecked Sendable {
         return event
     }
     
-    public func applyMouseSettings(linear: Bool, sensitivity: Double) {
-        guard mouseAccelerationApplied != linear || mouseScalingApplied != sensitivity else { return }
-        mouseAccelerationApplied = linear
-        mouseScalingApplied = sensitivity
+    public func applySystemMouseSettings(linear: Bool, sensitivity: Double) {
+        guard lastLinearAccel != linear || lastMouseScaling != sensitivity else { return }
+        lastLinearAccel = linear
+        lastMouseScaling = sensitivity
         
         DispatchQueue.global(qos: .utility).async {
             let task = Process()
             task.launchPath = "/usr/bin/defaults"
             let scaleVal = linear ? "-1" : String(format: "%.2f", sensitivity * 1.5)
-            task.arguments = ["write", ".GlobalPreferences", "com.apple.mouse.scaling", scaleVal]
+            // Use -g (NSGlobalDomain) so macOS Quartz applies globally
+            task.arguments = ["write", "-g", "com.apple.mouse.scaling", scaleVal]
             try? task.run()
         }
     }

@@ -180,8 +180,7 @@ public final class AppSettings: ObservableObject {
         self.swiftQuitDelaySeconds = defaults.object(forKey: "swiftQuitDelaySeconds") as? Int ?? 0
         self.swiftQuitExcludedApps = defaults.stringArray(forKey: "swiftQuitExcludedApps") ?? [
             "com.apple.Music",
-            "com.apple.mail",
-            "com.spotify.client"
+            "com.apple.mail"
         ]
         
         self.altTabEnabled = defaults.object(forKey: "altTabEnabled") as? Bool ?? true

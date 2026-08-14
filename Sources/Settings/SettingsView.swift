@@ -43,13 +43,13 @@ public struct SettingsView: View {
     
     public var body: some View {
         VStack(spacing: 0) {
-            // MARK: - Modern Header & Top Navigation Bar
-            VStack(spacing: 14) {
-                HStack(spacing: 14) {
+            // MARK: - Header & Adaptive Top Tab Bar
+            VStack(spacing: 12) {
+                HStack(spacing: 12) {
                     Image(systemName: "macwindow.on.rectangle")
-                        .font(.system(size: 20, weight: .bold))
+                        .font(.system(size: 18, weight: .bold))
                         .foregroundColor(.white)
-                        .frame(width: 38, height: 38)
+                        .frame(width: 34, height: 34)
                         .background(
                             LinearGradient(
                                 colors: [Color.blue, Color.purple],
@@ -57,16 +57,14 @@ public struct SettingsView: View {
                                 endPoint: .bottomTrailing
                             )
                         )
-                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                        .shadow(color: Color.blue.opacity(0.35), radius: 6, y: 2)
+                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                     
-                    VStack(alignment: .leading, spacing: 2) {
+                    VStack(alignment: .leading, spacing: 1) {
                         Text("WinMac")
-                            .font(.system(size: 17, weight: .bold, design: .rounded))
+                            .font(.system(size: 16, weight: .bold, design: .rounded))
                             .foregroundColor(.primary)
-                        
                         Text("macOS Verimlilik Paketi")
-                            .font(.system(size: 11.5, weight: .regular))
+                            .font(.system(size: 11))
                             .foregroundColor(.secondary)
                     }
                     
@@ -76,60 +74,62 @@ public struct SettingsView: View {
                     HStack(spacing: 6) {
                         Circle()
                             .fill(permissions.hasAccessibilityPermission ? Color.green : Color.orange)
-                            .frame(width: 8, height: 8)
+                            .frame(width: 7, height: 7)
                         
                         Text(permissions.hasAccessibilityPermission ? "Aktif" : "İzin Gerekli")
                             .font(.system(size: 11, weight: .bold, design: .rounded))
                             .foregroundColor(permissions.hasAccessibilityPermission ? .green : .orange)
                     }
                     .padding(.horizontal, 10)
-                    .padding(.vertical, 5)
+                    .padding(.vertical, 4)
                     .background(
                         (permissions.hasAccessibilityPermission ? Color.green : Color.orange).opacity(0.12)
                     )
                     .clipShape(Capsule())
                 }
-                .padding(.horizontal, 24)
-                .padding(.top, 20)
+                .padding(.horizontal, 20)
+                .padding(.top, 16)
                 
-                // Top Tab Capsule Selector
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 6) {
-                        ForEach(SettingsTab.allCases) { tab in
-                            Button(action: {
-                                withAnimation(.spring(response: 0.22, dampingFraction: 0.8)) {
-                                    currentTab = tab
-                                }
-                            }) {
-                                HStack(spacing: 7) {
-                                    Image(systemName: tab.icon)
-                                        .font(.system(size: 12, weight: .semibold))
-                                    
-                                    Text(tab.rawValue)
-                                        .font(.system(size: 12.5, weight: currentTab == tab ? .bold : .medium, design: .rounded))
-                                }
-                                .foregroundColor(currentTab == tab ? .white : .secondary)
-                                .padding(.horizontal, 14)
-                                .padding(.vertical, 8)
-                                .background(
-                                    ZStack {
-                                        if currentTab == tab {
-                                            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                                .fill(tab.accentColor.gradient)
-                                                .shadow(color: tab.accentColor.opacity(0.35), radius: 6, y: 2)
-                                        } else {
-                                            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                                .fill(Color.white.opacity(0.04))
-                                        }
-                                    }
-                                )
+                // Wrapping Adaptive Tab Grid (Never gets cut off or hidden)
+                LazyVGrid(
+                    columns: [GridItem(.adaptive(minimum: 125, maximum: 200), spacing: 8)],
+                    spacing: 8
+                ) {
+                    ForEach(SettingsTab.allCases) { tab in
+                        Button(action: {
+                            withAnimation(.spring(response: 0.22, dampingFraction: 0.8)) {
+                                currentTab = tab
                             }
-                            .buttonStyle(PlainButtonStyle())
+                        }) {
+                            HStack(spacing: 6) {
+                                Image(systemName: tab.icon)
+                                    .font(.system(size: 12, weight: .semibold))
+                                
+                                Text(tab.rawValue)
+                                    .font(.system(size: 11.5, weight: currentTab == tab ? .bold : .medium, design: .rounded))
+                                    .lineLimit(1)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .foregroundColor(currentTab == tab ? .white : .secondary)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 7)
+                            .background(
+                                ZStack {
+                                    if currentTab == tab {
+                                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                            .fill(tab.accentColor.gradient)
+                                    } else {
+                                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                            .fill(Color.white.opacity(0.04))
+                                    }
+                                }
+                            )
                         }
+                        .buttonStyle(PlainButtonStyle())
                     }
-                    .padding(.horizontal, 24)
-                    .padding(.bottom, 12)
                 }
+                .padding(.horizontal, 20)
+                .padding(.bottom, 12)
             }
             .background(
                 VisualEffectBlur(material: .headerView, blendingMode: .behindWindow)
@@ -161,7 +161,7 @@ public struct SettingsView: View {
                         PermissionsTabContent(permissions: permissions)
                     }
                 }
-                .padding(24)
+                .padding(20)
                 .frame(maxWidth: .infinity, alignment: .topLeading)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -605,7 +605,7 @@ private struct PermissionsTabContent: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("WinMac")
                             .font(.system(size: 15, weight: .bold, design: .rounded))
-                        Text("Sürüm 3.7.0")
+                        Text("Sürüm 3.8.0")
                             .font(.system(size: 12))
                             .foregroundColor(.secondary)
                     }
