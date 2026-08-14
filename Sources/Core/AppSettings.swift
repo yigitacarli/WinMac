@@ -48,6 +48,14 @@ public final class AppSettings: ObservableObject {
     
     private let defaults = UserDefaults.standard
     
+    // MARK: - General Settings
+    @Published public var showInDock: Bool {
+        didSet {
+            defaults.set(showInDock, forKey: "showInDock")
+            NSApp?.setActivationPolicy(showInDock ? .regular : .accessory)
+        }
+    }
+    
     // MARK: - Alt + Tab Settings
     @Published public var altTabEnabled: Bool {
         didSet { defaults.set(altTabEnabled, forKey: "altTabEnabled") }
@@ -139,6 +147,8 @@ public final class AppSettings: ObservableObject {
     
     // MARK: - Initializer
     private init() {
+        self.showInDock = defaults.object(forKey: "showInDock") as? Bool ?? true
+        
         self.altTabEnabled = defaults.object(forKey: "altTabEnabled") as? Bool ?? true
         
         let styleStr = defaults.string(forKey: "switcherStyle") ?? SwitcherStyle.thumbnails.rawValue
