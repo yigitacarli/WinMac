@@ -14,22 +14,21 @@ public final class FinderBridge: @unchecked Sendable {
         let f2Rename = defaults.object(forKey: "finderF2ToRename") as? Bool ?? true
         let deleteTrash = defaults.object(forKey: "finderDeleteToTrash") as? Bool ?? true
         
+        guard let frontApp = NSWorkspace.shared.frontmostApplication,
+              frontApp.bundleIdentifier == "com.apple.finder" else {
+            return event
+        }
+        
         let flags = event.flags
         let keyCode = CGKeyCode(event.getIntegerValueField(.keyboardEventKeycode))
         
-        // 1. Return / Enter Key (keyCode 36) -> Open selected file/folder
+        // 1. Return / Enter Key (keyCode 36) -> Open selected file (Cmd + Down)
         if keyCode == 36 && flags.intersection([.maskCommand, .maskControl, .maskAlternate, .maskShift]).isEmpty {
             if enterOpen {
                 DispatchQueue.main.async {
-                    if let frontApp = NSWorkspace.shared.frontmostApplication,
-                       frontApp.bundleIdentifier == "com.apple.finder" {
-                        SystemUtils.sendKeystroke(keyCode: 125, flags: .maskCommand)
-                    }
+                    SystemUtils.sendKeystroke(keyCode: 125, flags: .maskCommand)
                 }
-                if let frontApp = NSWorkspace.shared.frontmostApplication,
-                   frontApp.bundleIdentifier == "com.apple.finder" {
-                    return nil
-                }
+                return nil
             }
         }
         
@@ -37,15 +36,9 @@ public final class FinderBridge: @unchecked Sendable {
         if keyCode == 120 {
             if f2Rename {
                 DispatchQueue.main.async {
-                    if let frontApp = NSWorkspace.shared.frontmostApplication,
-                       frontApp.bundleIdentifier == "com.apple.finder" {
-                        SystemUtils.sendKeystroke(keyCode: 36, flags: [])
-                    }
+                    SystemUtils.sendKeystroke(keyCode: 36, flags: [])
                 }
-                if let frontApp = NSWorkspace.shared.frontmostApplication,
-                   frontApp.bundleIdentifier == "com.apple.finder" {
-                    return nil
-                }
+                return nil
             }
         }
         
@@ -53,15 +46,9 @@ public final class FinderBridge: @unchecked Sendable {
         if (keyCode == 51 || keyCode == 117) && flags.intersection([.maskCommand, .maskControl, .maskAlternate, .maskShift]).isEmpty {
             if deleteTrash {
                 DispatchQueue.main.async {
-                    if let frontApp = NSWorkspace.shared.frontmostApplication,
-                       frontApp.bundleIdentifier == "com.apple.finder" {
-                        SystemUtils.sendKeystroke(keyCode: 51, flags: .maskCommand)
-                    }
+                    SystemUtils.sendKeystroke(keyCode: 51, flags: .maskCommand)
                 }
-                if let frontApp = NSWorkspace.shared.frontmostApplication,
-                   frontApp.bundleIdentifier == "com.apple.finder" {
-                    return nil
-                }
+                return nil
             }
         }
         

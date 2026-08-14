@@ -53,12 +53,11 @@ public struct SystemUtils {
                 }
             }
         }
-        return nil
+        return NSScreen.main
     }
     
     // MARK: - Actions
     public static func lockScreen() {
-        // macOS Lock Screen mechanism
         let libHandle = dlopen("/System/Library/PrivateFrameworks/login.framework/Versions/Current/login", RTLD_LAZY)
         if let libHandle = libHandle {
             let sym = dlsym(libHandle, "SACLockScreenImmediate")
@@ -72,7 +71,6 @@ public struct SystemUtils {
             dlclose(libHandle)
         }
         
-        // Fallback to keystroke via AppleScript if dynamic symbol unavailable
         let script = "tell application \"System Events\" to keystroke \"q\" using {control down, command down}"
         if let appleScript = NSAppleScript(source: script) {
             var errorInfo: NSDictionary?
@@ -87,25 +85,24 @@ public struct SystemUtils {
     }
     
     public static func triggerScreenshot() {
-        // Trigger macOS Screencapture interactive area selection
         let task = Process()
         task.launchPath = "/usr/sbin/screencapture"
-        task.arguments = ["-i", "-c"] // interactive selection to clipboard
+        task.arguments = ["-i", "-c"]
         try? task.run()
     }
     
     // MARK: - Keystroke Synthesis
     public static func postKey(keyCode: CGKeyCode, flags: CGEventFlags, keyDown: Bool) {
-        let source = CGEventSource(stateID: .combinedSessionState)
+        let source = CGEventSource(stateID: .hidSystemState)
         if let event = CGEvent(keyboardEventSource: source, virtualKey: keyCode, keyDown: keyDown) {
             event.flags = flags
-            event.post(tap: .cghidEventTap)
+            event.post(tap: .cgSessionEventTap)
         }
     }
     
     public static func sendKeystroke(keyCode: CGKeyCode, flags: CGEventFlags) {
         postKey(keyCode: keyCode, flags: flags, keyDown: true)
-        usleep(5000)
+        usleep(10000)
         postKey(keyCode: keyCode, flags: flags, keyDown: false)
     }
 }

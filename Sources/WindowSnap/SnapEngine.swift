@@ -33,9 +33,7 @@ public final class SnapEngine: @unchecked Sendable {
     private var cycleStep: Int = 0
     
     // Drag-to-snap state
-    private var isDragging: Bool = false
     private var currentDragSnapTarget: SnapAction?
-    private var dragMonitor: Any?
     
     private init() {
         setupDragToSnapMonitor()
@@ -63,8 +61,8 @@ public final class SnapEngine: @unchecked Sendable {
         let frame = screen.frame
         let visibleFrame = screen.visibleFrame
         
-        let edgeThreshold: CGFloat = 20.0
-        let cornerThreshold: CGFloat = 50.0
+        let edgeThreshold: CGFloat = 25.0
+        let cornerThreshold: CGFloat = 60.0
         
         var targetAction: SnapAction?
         var previewRect: NSRect?
@@ -72,7 +70,7 @@ public final class SnapEngine: @unchecked Sendable {
         let halfW = visibleFrame.width / 2.0
         let halfH = visibleFrame.height / 2.0
         
-        // 1. Top Corners or Top Edge (Maximize)
+        // 1. Top Edge or Corners
         if mouseLoc.y >= frame.maxY - edgeThreshold {
             if mouseLoc.x <= frame.minX + cornerThreshold {
                 targetAction = .topLeftQuarter
@@ -85,7 +83,7 @@ public final class SnapEngine: @unchecked Sendable {
                 previewRect = visibleFrame
             }
         }
-        // 2. Bottom Corners
+        // 2. Bottom Edge or Corners
         else if mouseLoc.y <= frame.minY + edgeThreshold {
             if mouseLoc.x <= frame.minX + cornerThreshold {
                 targetAction = .bottomLeftQuarter
@@ -132,148 +130,43 @@ public final class SnapEngine: @unchecked Sendable {
         }
     }
     
-    // MARK: - Keyboard Shortcuts (Rectangle Pro)
-    public func handleKeyEvent(type: CGEventType, event: CGEvent) -> CGEvent? {
+    // MARK: - HotKey Dispatcher
+    public func handleShortcutAction(_ action: SnapAction) {
         let defaults = UserDefaults.standard
-        let isEnabled = defaults.object(forKey: "snapShortcutsEnabled") as? Bool ?? true
-        guard type == .keyDown, isEnabled else { return event }
-        
-        let flags = event.flags
         let cycleEnabled = defaults.object(forKey: "cycleRepeatedShortcuts") as? Bool ?? true
-        
-        // 1. Multi-display moves: Option + Control + Command + Left/Right
-        if flags.contains(.maskAlternate) && flags.contains(.maskControl) && flags.contains(.maskCommand) {
-            let keyCode = CGKeyCode(event.getIntegerValueField(.keyboardEventKeycode))
-            if keyCode == 123 { // Left
-                DispatchQueue.main.async { self.moveFocusedWindowToDisplay(direction: -1) }
-                return nil
-            } else if keyCode == 124 { // Right
-                DispatchQueue.main.async { self.moveFocusedWindowToDisplay(direction: 1) }
-                return nil
-            }
-        }
-        
-        // 2. Standard Rectangle Snap: Option + Control
-        guard flags.contains(.maskAlternate) && flags.contains(.maskControl) else {
-            return event
-        }
-        
-        let keyCode = CGKeyCode(event.getIntegerValueField(.keyboardEventKeycode))
         let now = Date()
         let isRecent = now.timeIntervalSince(lastActionTime) < 1.4
         
-        switch keyCode {
-        // Halves & Cycling Thirds
-        case 123: // Left Arrow
-            var action: SnapAction = .leftHalf
-            if cycleEnabled && isRecent && (lastAction == .leftHalf || lastAction == .leftTwoThirds || lastAction == .leftThird) {
+        var effectiveAction = action
+        
+        if cycleEnabled && isRecent {
+            switch action {
+            case .leftHalf, .leftTwoThirds, .leftThird:
                 cycleStep = (cycleStep + 1) % 3
-                action = cycleStep == 0 ? .leftHalf : (cycleStep == 1 ? .leftTwoThirds : .leftThird)
-            } else {
-                cycleStep = 0
-            }
-            recordAction(action)
-            DispatchQueue.main.async { self.snapFocusedWindow(to: action) }
-            return nil
-            
-        case 124: // Right Arrow
-            var action: SnapAction = .rightHalf
-            if cycleEnabled && isRecent && (lastAction == .rightHalf || lastAction == .rightTwoThirds || lastAction == .rightThird) {
+                effectiveAction = cycleStep == 0 ? .leftHalf : (cycleStep == 1 ? .leftTwoThirds : .leftThird)
+            case .rightHalf, .rightTwoThirds, .rightThird:
                 cycleStep = (cycleStep + 1) % 3
-                action = cycleStep == 0 ? .rightHalf : (cycleStep == 1 ? .rightTwoThirds : .rightThird)
-            } else {
-                cycleStep = 0
+                effectiveAction = cycleStep == 0 ? .rightHalf : (cycleStep == 1 ? .rightTwoThirds : .rightThird)
+            case .topHalf, .maximize:
+                effectiveAction = lastAction == .topHalf ? .maximize : .topHalf
+            case .bottomHalf, .center:
+                effectiveAction = lastAction == .bottomHalf ? .center : .bottomHalf
+            default:
+                break
             }
-            recordAction(action)
-            DispatchQueue.main.async { self.snapFocusedWindow(to: action) }
-            return nil
-            
-        case 126: // Up Arrow -> Top Half or Maximize
-            var action: SnapAction = .topHalf
-            if cycleEnabled && isRecent && (lastAction == .topHalf || lastAction == .maximize) {
-                action = lastAction == .topHalf ? .maximize : .topHalf
-            }
-            recordAction(action)
-            DispatchQueue.main.async { self.snapFocusedWindow(to: action) }
-            return nil
-            
-        case 125: // Down Arrow -> Bottom Half or Center
-            var action: SnapAction = .bottomHalf
-            if cycleEnabled && isRecent && (lastAction == .bottomHalf || lastAction == .center) {
-                action = lastAction == .bottomHalf ? .center : .bottomHalf
-            }
-            recordAction(action)
-            DispatchQueue.main.async { self.snapFocusedWindow(to: action) }
-            return nil
-            
-        // Maximize & Center
-        case 36:  // Return Key -> Maximize
-            recordAction(.maximize)
-            DispatchQueue.main.async { self.snapFocusedWindow(to: .maximize) }
-            return nil
-        case 8:   // C Key -> Center
-            recordAction(.center)
-            DispatchQueue.main.async { self.snapFocusedWindow(to: .center) }
-            return nil
-            
-        // Resize Window (+ / -)
-        case 24:  // '+' / '='
-            DispatchQueue.main.async { self.snapFocusedWindow(to: .expandSize) }
-            return nil
-        case 27:  // '-'
-            DispatchQueue.main.async { self.snapFocusedWindow(to: .shrinkSize) }
-            return nil
-            
-        // Quarters (U, I, J, K)
-        case 32:  // U -> Top Left
-            recordAction(.topLeftQuarter)
-            DispatchQueue.main.async { self.snapFocusedWindow(to: .topLeftQuarter) }
-            return nil
-        case 34:  // I -> Top Right
-            recordAction(.topRightQuarter)
-            DispatchQueue.main.async { self.snapFocusedWindow(to: .topRightQuarter) }
-            return nil
-        case 38:  // J -> Bottom Left
-            recordAction(.bottomLeftQuarter)
-            DispatchQueue.main.async { self.snapFocusedWindow(to: .bottomLeftQuarter) }
-            return nil
-        case 40:  // K -> Bottom Right
-            recordAction(.bottomRightQuarter)
-            DispatchQueue.main.async { self.snapFocusedWindow(to: .bottomRightQuarter) }
-            return nil
-            
-        // Thirds (D, F, G, E, T)
-        case 2:   // D -> Left 1/3
-            recordAction(.leftThird)
-            DispatchQueue.main.async { self.snapFocusedWindow(to: .leftThird) }
-            return nil
-        case 3:   // F -> Center 1/3
-            recordAction(.centerThird)
-            DispatchQueue.main.async { self.snapFocusedWindow(to: .centerThird) }
-            return nil
-        case 5:   // G -> Right 1/3
-            recordAction(.rightThird)
-            DispatchQueue.main.async { self.snapFocusedWindow(to: .rightThird) }
-            return nil
-        case 14:  // E -> Left 2/3
-            recordAction(.leftTwoThirds)
-            DispatchQueue.main.async { self.snapFocusedWindow(to: .leftTwoThirds) }
-            return nil
-        case 17:  // T -> Right 2/3
-            recordAction(.rightTwoThirds)
-            DispatchQueue.main.async { self.snapFocusedWindow(to: .rightTwoThirds) }
-            return nil
-            
-        default:
-            return event
+        } else {
+            cycleStep = 0
+        }
+        
+        self.lastAction = effectiveAction
+        self.lastActionTime = now
+        
+        DispatchQueue.main.async {
+            self.snapFocusedWindow(to: effectiveAction)
         }
     }
     
-    private func recordAction(_ action: SnapAction) {
-        self.lastAction = action
-        self.lastActionTime = Date()
-    }
-    
+    // MARK: - Window Manipulation Engine (Rectangle Architecture)
     public func snapFocusedWindow(to action: SnapAction) {
         guard let frontApp = NSWorkspace.shared.frontmostApplication else { return }
         let appElement = AXUIElementCreateApplication(frontApp.processIdentifier)
@@ -281,16 +174,26 @@ public final class SnapEngine: @unchecked Sendable {
         var focusedWindowVal: AnyObject?
         guard AXUIElementCopyAttributeValue(appElement, kAXFocusedWindowAttribute as CFString, &focusedWindowVal) == .success,
               let windowElement = focusedWindowVal as! AXUIElement? else {
+            // Fallback: try first window of front app
+            var windowsVal: AnyObject?
+            if AXUIElementCopyAttributeValue(appElement, kAXWindowsAttribute as CFString, &windowsVal) == .success,
+               let windowsList = windowsVal as? [AXUIElement], let firstWin = windowsList.first {
+                applySnap(windowElement: firstWin, appElement: appElement, frontApp: frontApp, action: action)
+            }
             return
         }
         
+        applySnap(windowElement: windowElement, appElement: appElement, frontApp: frontApp, action: action)
+    }
+    
+    private func applySnap(windowElement: AXUIElement, appElement: AXUIElement, frontApp: NSRunningApplication, action: SnapAction) {
         guard let screen = SystemUtils.screenForApp(pid: frontApp.processIdentifier) ?? NSScreen.main else {
             return
         }
         
         let gap = CGFloat(UserDefaults.standard.double(forKey: "snapWindowGaps"))
         let visibleFrame = screen.visibleFrame.insetBy(dx: gap, dy: gap)
-        let mainScreenHeight = NSScreen.screens[0].frame.height
+        let primaryHeight = NSScreen.screens[0].frame.height
         
         // Handle expand / shrink
         if action == .expandSize || action == .shrinkSize {
@@ -312,8 +215,7 @@ public final class SnapEngine: @unchecked Sendable {
                 var newSize = CGSize(width: newW, height: newH)
                 var newOrigin = CGPoint(x: currentPos.x - (deltaW / 2.0), y: currentPos.y - (deltaH / 2.0))
                 
-                if let s = AXValueCreate(.cgSize, &newSize) { AXUIElementSetAttributeValue(windowElement, kAXSizeAttribute as CFString, s) }
-                if let p = AXValueCreate(.cgPoint, &newOrigin) { AXUIElementSetAttributeValue(windowElement, kAXPositionAttribute as CFString, p) }
+                setFrame(windowElement: windowElement, appElement: appElement, position: newOrigin, size: newSize)
             }
             return
         }
@@ -368,15 +270,39 @@ public final class SnapEngine: @unchecked Sendable {
             return
         }
         
-        let axY = mainScreenHeight - targetRect.maxY
-        var origin = CGPoint(x: targetRect.minX, y: axY)
-        var size = CGSize(width: targetRect.width, height: targetRect.height)
+        let axY = primaryHeight - targetRect.maxY
+        let origin = CGPoint(x: targetRect.minX, y: axY)
+        let size = CGSize(width: targetRect.width, height: targetRect.height)
         
-        if let posVal = AXValueCreate(.cgPoint, &origin) {
+        setFrame(windowElement: windowElement, appElement: appElement, position: origin, size: size)
+    }
+    
+    private func setFrame(windowElement: AXUIElement, appElement: AXUIElement, position: CGPoint, size: CGSize) {
+        // Rectangle technique: disable AXEnhancedUserInterface temporarily to allow Chromium/Electron apps to resize
+        var enhancedUIRef: AnyObject?
+        let hasEnhancedUI = AXUIElementCopyAttributeValue(appElement, "AXEnhancedUserInterface" as CFString, &enhancedUIRef) == .success
+        if hasEnhancedUI {
+            AXUIElementSetAttributeValue(appElement, "AXEnhancedUserInterface" as CFString, kCFBooleanFalse)
+        }
+        
+        var s = size
+        var p = position
+        
+        // 1. Set size first
+        if let sizeVal = AXValueCreate(.cgSize, &s) {
+            AXUIElementSetAttributeValue(windowElement, kAXSizeAttribute as CFString, sizeVal)
+        }
+        // 2. Set position
+        if let posVal = AXValueCreate(.cgPoint, &p) {
             AXUIElementSetAttributeValue(windowElement, kAXPositionAttribute as CFString, posVal)
         }
-        if let sizeVal = AXValueCreate(.cgSize, &size) {
+        // 3. Set size again to ensure constraints
+        if let sizeVal = AXValueCreate(.cgSize, &s) {
             AXUIElementSetAttributeValue(windowElement, kAXSizeAttribute as CFString, sizeVal)
+        }
+        
+        if hasEnhancedUI {
+            AXUIElementSetAttributeValue(appElement, "AXEnhancedUserInterface" as CFString, kCFBooleanTrue)
         }
     }
     
@@ -401,11 +327,11 @@ public final class SnapEngine: @unchecked Sendable {
         }
         
         let targetFrame = targetScreen.visibleFrame
-        let mainScreenHeight = screens[0].frame.height
+        let primaryHeight = screens[0].frame.height
         
-        var origin = CGPoint(x: targetFrame.minX + 50, y: mainScreenHeight - targetFrame.maxY + 50)
-        if let posVal = AXValueCreate(.cgPoint, &origin) {
-            AXUIElementSetAttributeValue(windowElement, kAXPositionAttribute as CFString, posVal)
-        }
+        let origin = CGPoint(x: targetFrame.minX + 40, y: primaryHeight - targetFrame.maxY + 40)
+        let size = CGSize(width: targetFrame.width * 0.7, height: targetFrame.height * 0.7)
+        
+        setFrame(windowElement: windowElement, appElement: appElement, position: origin, size: size)
     }
 }

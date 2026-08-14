@@ -16,6 +16,9 @@ public final class EventTapManager: @unchecked Sendable {
     public func start() {
         guard eventTap == nil else { return }
         
+        // Start Carbon HotKeys for 100% reliable global window snapping
+        HotKeyManager.shared.start()
+        
         let eventMask: CGEventMask = (
             (1 << CGEventType.keyDown.rawValue) |
             (1 << CGEventType.keyUp.rawValue) |
@@ -24,20 +27,20 @@ public final class EventTapManager: @unchecked Sendable {
         )
         
         guard let tap = CGEvent.tapCreate(
-            tap: .cghidEventTap,
+            tap: .cgSessionEventTap,
             place: .headInsertEventTap,
             options: .defaultTap,
             eventsOfInterest: eventMask,
             callback: { (proxy, type, event, refcon) -> Unmanaged<CGEvent>? in
                 guard let refcon = refcon else {
-                    return Unmanaged.passRetained(event)
+                    return Unmanaged.passUnretained(event)
                 }
                 let manager = Unmanaged<EventTapManager>.fromOpaque(refcon).takeUnretainedValue()
                 return manager.handleEvent(proxy: proxy, type: type, event: event)
             },
             userInfo: Unmanaged.passUnretained(self).toOpaque()
         ) else {
-            print("[WinMac] Warning: Failed to create CGEventTap. Needs Accessibility permission.")
+            print("[WinMac] Warning: Failed to create CGEventTap at .cgSessionEventTap. Needs Accessibility permission.")
             return
         }
         
@@ -46,7 +49,7 @@ public final class EventTapManager: @unchecked Sendable {
         self.runLoopSource = source
         CFRunLoopAddSource(CFRunLoopGetMain(), source, .commonModes)
         CGEvent.tapEnable(tap: tap, enable: true)
-        print("[WinMac] Global EventTap successfully started.")
+        print("[WinMac] Global EventTap successfully started at .cgSessionEventTap.")
     }
     
     public func stop() {
@@ -65,13 +68,13 @@ public final class EventTapManager: @unchecked Sendable {
             if let tap = eventTap {
                 CGEvent.tapEnable(tap: tap, enable: true)
             }
-            return Unmanaged.passRetained(event)
+            return Unmanaged.passUnretained(event)
         }
         
-        // 1. Mouse Scroll Inversion (LinearMouse Engine)
+        // 1. Mouse Scroll Inversion & Modifiers (LinearMouse Pro Engine)
         if type == .scrollWheel {
             if let modified = ScrollInverter.shared.handleScrollEvent(event: event) {
-                return Unmanaged.passRetained(modified)
+                return (modified === event) ? Unmanaged.passUnretained(event) : Unmanaged.passRetained(modified)
             }
             return nil
         }
@@ -91,13 +94,12 @@ public final class EventTapManager: @unchecked Sendable {
                     AltTabState.shared.confirmSelection()
                 }
             }
-            return Unmanaged.passRetained(event)
+            return Unmanaged.passUnretained(event)
         }
         
         // 3. Alt + Tab Trigger
         let altTabEnabled = defaults.object(forKey: "altTabEnabled") as? Bool ?? true
         if type == .keyDown && altTabEnabled {
-            // Option + Tab (Tab keyCode = 48)
             if keyCode == 48 && flags.contains(.maskAlternate) && !flags.contains(.maskControl) {
                 if !isAltTabActive {
                     isAltTabActive = true
@@ -120,7 +122,7 @@ public final class EventTapManager: @unchecked Sendable {
         // 4. Win + V / Option + V -> Clipboard History
         let clipEnabled = defaults.object(forKey: "clipboardHistoryEnabled") as? Bool ?? true
         if type == .keyDown && clipEnabled {
-            if (keyCode == 9 && flags.contains(.maskAlternate) && !flags.contains(.maskCommand)) ||
+            if (keyCode == 9 && flags.contains(.maskAlternate) && !flags.contains(.maskControl)) ||
                (keyCode == 9 && flags.contains(.maskCommand) && flags.contains(.maskShift)) {
                 DispatchQueue.main.async {
                     ClipboardHUDController.shared.toggle()
@@ -129,16 +131,7 @@ public final class EventTapManager: @unchecked Sendable {
             }
         }
         
-        // 5. Rectangle Window Snapping (Option + Control + ...)
-        if let snapResult = SnapEngine.shared.handleKeyEvent(type: type, event: event) {
-            if snapResult !== event {
-                return Unmanaged.passRetained(snapResult)
-            }
-        } else {
-            return nil
-        }
-        
-        // 6. System Shortcuts
+        // 5. System Shortcuts (Win+L, etc.)
         if let sysResult = SystemShortcuts.shared.handleKeyEvent(type: type, event: event) {
             if sysResult !== event {
                 return Unmanaged.passRetained(sysResult)
@@ -147,7 +140,7 @@ public final class EventTapManager: @unchecked Sendable {
             return nil
         }
         
-        // 7. Finder Shortcuts
+        // 6. Finder Shortcuts (Enter to open, F2 rename, Delete trash)
         if let finderResult = FinderBridge.shared.handleKeyEvent(type: type, event: event) {
             if finderResult !== event {
                 return Unmanaged.passRetained(finderResult)
@@ -156,11 +149,15 @@ public final class EventTapManager: @unchecked Sendable {
             return nil
         }
         
-        // 8. Ctrl to Cmd Key Remapping
+        // 7. Ctrl to Cmd Key Remapping
         if let ctrlResult = CtrlToCmdMapper.shared.handleKeyEvent(type: type, event: event) {
-            return Unmanaged.passRetained(ctrlResult)
+            if ctrlResult !== event {
+                return Unmanaged.passRetained(ctrlResult)
+            }
         } else {
             return nil
         }
+        
+        return Unmanaged.passUnretained(event)
     }
 }
