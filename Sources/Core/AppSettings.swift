@@ -56,6 +56,17 @@ public final class AppSettings: ObservableObject {
         }
     }
     
+    // MARK: - SwiftQuit (Auto Quit on Last Window Close)
+    @Published public var swiftQuitEnabled: Bool {
+        didSet { defaults.set(swiftQuitEnabled, forKey: "swiftQuitEnabled") }
+    }
+    @Published public var swiftQuitDelaySeconds: Int {
+        didSet { defaults.set(swiftQuitDelaySeconds, forKey: "swiftQuitDelaySeconds") }
+    }
+    @Published public var swiftQuitExcludedApps: [String] {
+        didSet { defaults.set(swiftQuitExcludedApps, forKey: "swiftQuitExcludedApps") }
+    }
+    
     // MARK: - Alt + Tab Settings
     @Published public var altTabEnabled: Bool {
         didSet { defaults.set(altTabEnabled, forKey: "altTabEnabled") }
@@ -166,6 +177,14 @@ public final class AppSettings: ObservableObject {
     // MARK: - Initializer
     private init() {
         self.showInDock = defaults.object(forKey: "showInDock") as? Bool ?? true
+        
+        self.swiftQuitEnabled = defaults.object(forKey: "swiftQuitEnabled") as? Bool ?? true
+        self.swiftQuitDelaySeconds = defaults.object(forKey: "swiftQuitDelaySeconds") as? Int ?? 0
+        self.swiftQuitExcludedApps = defaults.stringArray(forKey: "swiftQuitExcludedApps") ?? [
+            "com.apple.Music",
+            "com.apple.mail",
+            "com.spotify.client"
+        ]
         
         self.altTabEnabled = defaults.object(forKey: "altTabEnabled") as? Bool ?? true
         

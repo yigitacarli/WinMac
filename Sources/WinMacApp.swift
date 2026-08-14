@@ -21,12 +21,14 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         
         setupStatusBar()
         EventTapManager.shared.start()
+        SwiftQuitEngine.shared.start()
         
         PermissionsManager.shared.$hasAccessibilityPermission
             .receive(on: DispatchQueue.main)
             .sink { [weak self] hasAccess in
                 if hasAccess {
                     EventTapManager.shared.start()
+                    SwiftQuitEngine.shared.start()
                 }
                 self?.updateStatusMenu()
             }
@@ -92,12 +94,20 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(mouseScrollItem)
         
         let snapItem = NSMenuItem(
-            title: "Pencere Yaslama (Rectangle): \(AppSettings.shared.snapShortcutsEnabled ? "Açık" : "Kapalı")",
+            title: "Pencere Yaslama (Rectangle Pro): \(AppSettings.shared.snapShortcutsEnabled ? "Açık" : "Kapalı")",
             action: #selector(toggleSnap),
             keyEquivalent: ""
         )
         snapItem.target = self
         menu.addItem(snapItem)
+        
+        let quitEngineItem = NSMenuItem(
+            title: "X ile Uygulamayı Kapat (SwiftQuit): \(AppSettings.shared.swiftQuitEnabled ? "Açık" : "Kapalı")",
+            action: #selector(toggleSwiftQuit),
+            keyEquivalent: ""
+        )
+        quitEngineItem.target = self
+        menu.addItem(quitEngineItem)
         
         let ctrlCmdItem = NSMenuItem(
             title: "Ctrl -> Cmd Çevirici: \(AppSettings.shared.ctrlToCmdRemapEnabled ? "Açık" : "Kapalı")",
@@ -150,6 +160,11 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
     
     @objc private func toggleSnap() {
         AppSettings.shared.snapShortcutsEnabled.toggle()
+        updateStatusMenu()
+    }
+    
+    @objc private func toggleSwiftQuit() {
+        AppSettings.shared.swiftQuitEnabled.toggle()
         updateStatusMenu()
     }
     

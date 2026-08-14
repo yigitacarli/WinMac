@@ -11,6 +11,7 @@ public struct SettingsView: View {
     public enum SettingsTab: String, CaseIterable, Identifiable {
         case alttab = "Alt + Tab"
         case snap = "Pencere Yaslama (Rectangle Pro)"
+        case swiftquit = "X ile Tamamen Kapat (SwiftQuit)"
         case mouse = "Linear Mouse Pro"
         case keyboard = "Klavye"
         case finder = "Finder"
@@ -23,6 +24,7 @@ public struct SettingsView: View {
             switch self {
             case .alttab: return "macwindow.on.rectangle"
             case .snap: return "rectangle.split.2x1.fill"
+            case .swiftquit: return "xmark.circle.fill"
             case .mouse: return "computermouse.fill"
             case .keyboard: return "keyboard.fill"
             case .finder: return "folder.fill"
@@ -35,6 +37,7 @@ public struct SettingsView: View {
             switch self {
             case .alttab: return .blue
             case .snap: return .indigo
+            case .swiftquit: return .red
             case .mouse: return .teal
             case .keyboard: return .orange
             case .finder: return .cyan
@@ -65,7 +68,7 @@ public struct SettingsView: View {
                 }
             }
             .listStyle(SidebarListStyle())
-            .frame(minWidth: 240)
+            .frame(minWidth: 260)
         } detail: {
             ScrollView(.vertical, showsIndicators: true) {
                 VStack(alignment: .leading, spacing: 20) {
@@ -74,6 +77,8 @@ public struct SettingsView: View {
                         AltTabSettingsSection(settings: settings)
                     case .snap:
                         SnapSettingsSection(settings: settings)
+                    case .swiftquit:
+                        SwiftQuitSettingsSection(settings: settings)
                     case .mouse:
                         MouseSettingsSection(settings: settings)
                     case .keyboard:
@@ -90,7 +95,7 @@ public struct SettingsView: View {
                 .frame(maxWidth: .infinity, alignment: .topLeading)
             }
         }
-        .frame(width: 820, height: 600)
+        .frame(width: 840, height: 600)
     }
 }
 
@@ -211,6 +216,66 @@ private struct SnapSettingsSection: View {
                         ShortcutRow(key: "⌥ + ⌃ + + / -", label: "Pencereyi Büyüt / Küçült")
                         ShortcutRow(key: "⌥ + ⌃ + ⌘ + Oklar", label: "Diğer Monitöre Taşı")
                     }
+                }
+            }
+        }
+    }
+}
+
+private struct SwiftQuitSettingsSection: View {
+    @ObservedObject var settings: AppSettings
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            HeaderTitle(title: "X ile Kapat (SwiftQuit)", subtitle: "Kırmızı 'X' butonuna basıp son pencereyi kapattığınızda uygulamadan tamamen çıkın.")
+            
+            HStack(alignment: .top, spacing: 14) {
+                Image(systemName: "xmark.app.fill")
+                    .foregroundColor(.red)
+                    .font(.system(size: 24))
+                
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Windows Tarzı Çıkış Deneyimi")
+                        .font(.system(size: 13, weight: .bold, design: .rounded))
+                    Text("Mac'te sol üstteki kırmızı 'X' butonuna bastığınızda uygulama arka planda çalışmaya devam eder (Dock'ta noktası kalır). SwiftQuit özelliği sayesinde bir uygulamanın son penceresi kapandığında uygulama tıpkı Windows'taki gibi kendiliğinden tamamen kapanır (Quit).")
+                        .font(.system(size: 12))
+                        .foregroundColor(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .padding(14)
+            .background(Color.red.opacity(0.12))
+            .cornerRadius(12)
+            
+            SettingsCard {
+                ToggleRow(
+                    title: "Otomatik Çıkışı Etkinleştir (SwiftQuit)",
+                    subtitle: "Son pencere kapandığında uygulamayı sonlandırır.",
+                    isOn: $settings.swiftQuitEnabled
+                )
+                
+                Divider()
+                
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Kapanma Gecikmesi:")
+                        .font(.system(size: 13, weight: .semibold, design: .rounded))
+                    
+                    Picker("", selection: $settings.swiftQuitDelaySeconds) {
+                        Text("Anında (0 sn)").tag(0)
+                        Text("1 Saniye Gecikme").tag(1)
+                        Text("2 Saniye Gecikme").tag(2)
+                    }
+                    .pickerStyle(SegmentedPickerStyle())
+                }
+                
+                Divider()
+                
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Varsayılan Olarak Korunan Uygulamalar:")
+                        .font(.system(size: 12, weight: .bold))
+                    Text("Finder, Sistem Ayarları, Müzik ve Mail gibi arka planda kalması gereken uygulamalar otomatik olarak korunur.")
+                        .font(.system(size: 11))
+                        .foregroundColor(.secondary)
                 }
             }
         }
@@ -457,7 +522,7 @@ private struct PermissionsSettingsSection: View {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("WinMac — Windows to Mac Super Toolkit")
                         .font(.system(size: 14, weight: .bold, design: .rounded))
-                    Text("Sürüm 3.0.0 Pro • %100 Açık Kaynak & Ücretsiz")
+                    Text("Sürüm 3.1.0 • SwiftQuit & Rectangle Pro & LinearMouse")
                         .font(.system(size: 12))
                         .foregroundColor(.secondary)
                 }
