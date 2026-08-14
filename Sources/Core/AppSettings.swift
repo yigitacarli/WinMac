@@ -3,16 +3,16 @@ import SwiftUI
 import Combine
 
 public enum SwitcherStyle: String, CaseIterable, Identifiable, Codable, Sendable {
-    case thumbnails = "thumbnails"
     case icons = "icons"
+    case thumbnails = "thumbnails"
     case titles = "titles"
     
     public var id: String { rawValue }
     
     public var title: String {
         switch self {
-        case .thumbnails: return "Küçük Resimler (Thumbnails)"
-        case .icons: return "Uygulama Simgeleri (Icons)"
+        case .icons: return "Uygulama Simgeleri & Kartlar (Icons)"
+        case .thumbnails: return "Geniş Kartlar (Thumbnails)"
         case .titles: return "Kompakt Liste (Titles)"
         }
     }
@@ -188,8 +188,8 @@ public final class AppSettings: ObservableObject {
         
         self.altTabEnabled = defaults.object(forKey: "altTabEnabled") as? Bool ?? true
         
-        let styleStr = defaults.string(forKey: "switcherStyle") ?? SwitcherStyle.thumbnails.rawValue
-        self.switcherStyle = SwitcherStyle(rawValue: styleStr) ?? .thumbnails
+        let styleStr = defaults.string(forKey: "switcherStyle") ?? SwitcherStyle.icons.rawValue
+        self.switcherStyle = SwitcherStyle(rawValue: styleStr) ?? .icons
         
         let shortcutStr = defaults.string(forKey: "switcherShortcut") ?? AltTabShortcut.optionTab.rawValue
         self.switcherShortcut = AltTabShortcut(rawValue: shortcutStr) ?? .optionTab

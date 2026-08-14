@@ -1,6 +1,4 @@
-import Foundation
 import Cocoa
-import CoreGraphics
 import ApplicationServices
 import Combine
 
@@ -8,10 +6,9 @@ import Combine
 public final class PermissionsManager: ObservableObject {
     public static let shared = PermissionsManager()
     
-    @Published public var hasAccessibilityPermission: Bool = false
-    @Published public var hasScreenRecordingPermission: Bool = false
+    @Published public private(set) var hasAccessibilityPermission: Bool = false
     
-    private var timer: AnyCancellable?
+    private var timer: Timer?
     
     private init() {
         checkPermissions()
@@ -19,50 +16,33 @@ public final class PermissionsManager: ObservableObject {
     }
     
     public var allPermissionsGranted: Bool {
-        hasAccessibilityPermission && hasScreenRecordingPermission
+        return hasAccessibilityPermission
     }
     
     public func checkPermissions() {
-        // Check Accessibility
-        let options = ["AXTrustedCheckOptionPrompt": false] as CFDictionary
-        self.hasAccessibilityPermission = AXIsProcessTrustedWithOptions(options)
-        
-        // Check Screen Recording
-        if #available(macOS 11.0, *) {
-            self.hasScreenRecordingPermission = CGPreflightScreenCaptureAccess()
-        } else {
-            self.hasScreenRecordingPermission = true
+        let trusted = AXIsProcessTrusted()
+        if self.hasAccessibilityPermission != trusted {
+            self.hasAccessibilityPermission = trusted
+        }
+    }
+    
+    private func startPolling() {
+        timer = Timer.scheduledTimer(withTimeInterval: 1.5, repeats: true) { [weak self] _ in
+            Task { @MainActor in
+                self?.checkPermissions()
+            }
         }
     }
     
     public func requestAccessibilityPermission() {
-        let options = ["AXTrustedCheckOptionPrompt": true] as CFDictionary
-        _ = AXIsProcessTrustedWithOptions(options)
-    }
-    
-    public func requestScreenRecordingPermission() {
-        if #available(macOS 11.0, *) {
-            _ = CGRequestScreenCaptureAccess()
-        }
+        let key = "AXTrustedCheckOptionPrompt" as CFString
+        let options = [key: true] as CFDictionary
+        AXIsProcessTrustedWithOptions(options)
     }
     
     public func openAccessibilitySettings() {
         if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
             NSWorkspace.shared.open(url)
         }
-    }
-    
-    public func openScreenRecordingSettings() {
-        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture") {
-            NSWorkspace.shared.open(url)
-        }
-    }
-    
-    private func startPolling() {
-        timer = Timer.publish(every: 1.5, on: .main, in: .common)
-            .autoconnect()
-            .sink { [weak self] _ in
-                self?.checkPermissions()
-            }
     }
 }

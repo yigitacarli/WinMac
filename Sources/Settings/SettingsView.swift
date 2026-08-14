@@ -487,28 +487,16 @@ private struct PermissionsSettingsSection: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
-            HeaderTitle(title: "Sistem İzinleri & Hakkında", subtitle: "WinMac'in kusursuz çalışması için gerekli macOS izinleri.")
+            HeaderTitle(title: "Sistem İzinleri & Hakkında", subtitle: "WinMac'in kusursuz çalışması için gerekli tek izin.")
             
             SettingsCard {
                 PermissionRow(
                     title: "Erişilebilirlik (Accessibility)",
-                    subtitle: "Global kısayollar, pencere odaklama ve yaslama için gereklidir.",
+                    subtitle: "Pencereleri bulma, odaklama, yaslama ve global kısayollar için gereklidir. (Ekran kaydı izni gerektirmez!)",
                     isGranted: permissions.hasAccessibilityPermission,
                     onRequest: {
                         permissions.requestAccessibilityPermission()
                         permissions.openAccessibilitySettings()
-                    }
-                )
-                
-                Divider()
-                
-                PermissionRow(
-                    title: "Ekran Kaydı (Screen Recording)",
-                    subtitle: "Alt + Tab pencerelerinin canlı küçük resimlerini (thumbnails) üretmek için gereklidir.",
-                    isGranted: permissions.hasScreenRecordingPermission,
-                    onRequest: {
-                        permissions.requestScreenRecordingPermission()
-                        permissions.openScreenRecordingSettings()
                     }
                 )
             }
@@ -522,7 +510,7 @@ private struct PermissionsSettingsSection: View {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("WinMac — Windows to Mac Super Toolkit")
                         .font(.system(size: 14, weight: .bold, design: .rounded))
-                    Text("Sürüm 3.1.0 • SwiftQuit & Rectangle Pro & LinearMouse")
+                    Text("Sürüm 3.2.0 • Sıfır Ekran Kaydı İzni & %100 Açık Kaynak")
                         .font(.system(size: 12))
                         .foregroundColor(.secondary)
                 }

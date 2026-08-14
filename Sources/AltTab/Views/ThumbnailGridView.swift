@@ -5,7 +5,7 @@ public struct ThumbnailGridView: View {
     let windows: [WindowModel]
     
     private let columns = [
-        GridItem(.adaptive(minimum: 220, maximum: 280), spacing: 16)
+        GridItem(.adaptive(minimum: 180, maximum: 240), spacing: 16)
     ]
     
     public init(state: AltTabState, windows: [WindowModel]) {
@@ -34,7 +34,7 @@ public struct ThumbnailGridView: View {
             }
             .padding(20)
         }
-        .frame(maxHeight: 480)
+        .frame(maxHeight: 420)
     }
 }
 
@@ -45,118 +45,94 @@ private struct ThumbnailCard: View {
     let onHover: (Bool) -> Void
     
     var body: some View {
-        VStack(spacing: 10) {
-            // Window Preview Frame
-            ZStack {
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(Color.black.opacity(0.45))
-                    .frame(height: 140)
-                
-                if let thumb = window.thumbnail {
-                    Image(nsImage: thumb)
+        VStack(alignment: .leading, spacing: 0) {
+            // Header: App Icon & Name
+            HStack(spacing: 8) {
+                if let icon = window.appIcon {
+                    Image(nsImage: icon)
                         .resizable()
                         .aspectRatio(contentMode: .fit)
-                        .frame(maxWidth: .infinity, maxHeight: 140)
-                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        .frame(width: 22, height: 22)
                 } else {
-                    // Elegant fallback
-                    VStack(spacing: 8) {
-                        if let icon = window.appIcon {
-                            Image(nsImage: icon)
-                                .resizable()
-                                .aspectRatio(contentMode: .fit)
-                                .frame(width: 54, height: 54)
-                        } else {
-                            Image(systemName: "macwindow")
-                                .font(.system(size: 36))
-                                .foregroundColor(.secondary)
-                        }
-                    }
+                    Image(systemName: "app.fill")
+                        .foregroundColor(.blue)
+                        .frame(width: 22, height: 22)
                 }
                 
-                // Subtle glass light highlight
-                LinearGradient(
-                    colors: [Color.white.opacity(0.12), Color.clear],
-                    startPoint: .top,
-                    endPoint: .center
-                )
-                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                .allowsHitTesting(false)
+                Text(window.appName)
+                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                    .foregroundColor(isSelected ? .white : .primary)
+                    .lineLimit(1)
                 
-                // Floating App Icon Squircle Badge (Top-Left)
-                VStack {
-                    HStack {
-                        if let icon = window.appIcon {
-                            Image(nsImage: icon)
-                                .resizable()
-                                .aspectRatio(contentMode: .fit)
-                                .frame(width: 26, height: 26)
-                                .padding(4)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                        .fill(Color.black.opacity(0.65))
-                                        .shadow(color: Color.black.opacity(0.3), radius: 4, y: 2)
-                                )
-                                .padding(8)
-                        }
-                        Spacer()
-                    }
-                    Spacer()
-                }
-            }
-            .frame(height: 140)
-            
-            // Labels
-            HStack(spacing: 8) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(window.appName)
-                        .font(.system(size: 12, weight: .bold, design: .rounded))
-                        .foregroundColor(isSelected ? .white : .primary.opacity(0.95))
-                        .lineLimit(1)
-                    
-                    Text(window.title)
-                        .font(.system(size: 11, weight: .regular))
-                        .foregroundColor(isSelected ? .white.opacity(0.85) : .secondary)
-                        .lineLimit(1)
-                }
                 Spacer()
-            }
-            .padding(.horizontal, 6)
-        }
-        .padding(10)
-        .background(
-            ZStack {
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .fill(
-                        isSelected
-                            ? AnyShapeStyle(LinearGradient(colors: [Color.blue.opacity(0.4), Color.blue.opacity(0.2)], startPoint: .top, endPoint: .bottom))
-                            : AnyShapeStyle(Color.white.opacity(0.06))
-                    )
                 
-                if isSelected {
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .stroke(
-                            LinearGradient(
-                                colors: [Color.blue.opacity(0.9), Color.cyan.opacity(0.6)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            ),
-                            lineWidth: 2
-                        )
-                } else {
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .stroke(Color.white.opacity(0.12), lineWidth: 1)
+                if window.isMinimized {
+                    Text("Gizli")
+                        .font(.system(size: 9.5, weight: .bold))
+                        .foregroundColor(.orange)
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 2)
+                        .background(Color.orange.opacity(0.18))
+                        .cornerRadius(4)
                 }
             }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .background(Color.white.opacity(0.04))
+            
+            Divider()
+                .background(Color.white.opacity(0.08))
+            
+            // Body: Large App Icon & Window Title
+            VStack(spacing: 12) {
+                if let icon = window.appIcon {
+                    Image(nsImage: icon)
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(width: 54, height: 54)
+                        .shadow(color: Color.black.opacity(0.25), radius: 6, y: 3)
+                }
+                
+                Text(window.title)
+                    .font(.system(size: 11.5, weight: .medium))
+                    .foregroundColor(isSelected ? .white : .secondary)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 8)
+            }
+            .frame(maxWidth: .infinity, minHeight: 110)
+            .background(Color.black.opacity(0.15))
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(
+                    isSelected
+                        ? AnyShapeStyle(LinearGradient(colors: [Color.blue.opacity(0.35), Color.blue.opacity(0.18)], startPoint: .top, endPoint: .bottom))
+                        : AnyShapeStyle(Color.white.opacity(0.05))
+                )
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(
+                    isSelected
+                        ? LinearGradient(colors: [Color.blue.opacity(0.95), Color.cyan.opacity(0.7)], startPoint: .topLeading, endPoint: .bottomTrailing)
+                        : LinearGradient(colors: [Color.white.opacity(0.12), Color.white.opacity(0.05)], startPoint: .top, endPoint: .bottom),
+                    lineWidth: isSelected ? 2 : 1
+                )
         )
         .shadow(
-            color: isSelected ? Color.blue.opacity(0.45) : Color.black.opacity(0.2),
+            color: isSelected ? Color.blue.opacity(0.4) : Color.black.opacity(0.2),
             radius: isSelected ? 12 : 6,
             y: isSelected ? 4 : 2
         )
-        .scaleEffect(isSelected ? 1.03 : 1.0)
-        .animation(.spring(response: 0.22, dampingFraction: 0.78), value: isSelected)
-        .onTapGesture(perform: onTap)
-        .onHover(perform: onHover)
+        .scaleEffect(isSelected ? 1.02 : 1.0)
+        .animation(.spring(response: 0.22, dampingFraction: 0.72), value: isSelected)
+        .onTapGesture {
+            onTap()
+        }
+        .onHover { hovering in
+            onHover(hovering)
+        }
     }
 }

@@ -1,5 +1,4 @@
 import Cocoa
-import CoreGraphics
 import ApplicationServices
 import Foundation
 
@@ -9,79 +8,104 @@ public final class WindowEngine {
     
     private init() {}
     
-    // MARK: - Fetch Windows
+    // MARK: - Fetch Windows (100% Accessibility-based, Zero Screen Recording required)
     public func getWindows() -> [WindowModel] {
-        let options: CGWindowListOption = [.optionOnScreenOnly, .excludeDesktopElements]
-        guard let windowInfoList = CGWindowListCopyWindowInfo(options, kCGNullWindowID) as? [[String: AnyObject]] else {
-            return []
+        var result: [WindowModel] = []
+        let ownPid = ProcessInfo.processInfo.processIdentifier
+        let runningApps = NSWorkspace.shared.runningApplications
+        
+        for app in runningApps {
+            guard app.activationPolicy == .regular,
+                  app.processIdentifier != ownPid,
+                  !app.isTerminated else {
+                continue
+            }
+            
+            let pid = app.processIdentifier
+            let appName = app.localizedName ?? "Uygulama"
+            let appIcon = app.icon ?? NSWorkspace.shared.icon(forFile: app.bundleURL?.path ?? "")
+            let bundleId = app.bundleIdentifier
+            let appElement = AXUIElementCreateApplication(pid)
+            
+            var windowsVal: AnyObject?
+            let axResult = AXUIElementCopyAttributeValue(appElement, kAXWindowsAttribute as CFString, &windowsVal)
+            
+            if axResult == .success, let axWindows = windowsVal as? [AXUIElement], !axWindows.isEmpty {
+                for (index, win) in axWindows.enumerated() {
+                    var titleVal: AnyObject?
+                    var minVal: AnyObject?
+                    var sizeVal: AnyObject?
+                    var posVal: AnyObject?
+                    
+                    AXUIElementCopyAttributeValue(win, kAXTitleAttribute as CFString, &titleVal)
+                    AXUIElementCopyAttributeValue(win, kAXMinimizedAttribute as CFString, &minVal)
+                    AXUIElementCopyAttributeValue(win, kAXSizeAttribute as CFString, &sizeVal)
+                    AXUIElementCopyAttributeValue(win, kAXPositionAttribute as CFString, &posVal)
+                    
+                    let title = (titleVal as? String) ?? ""
+                    let isMinimized = (minVal as? Bool) ?? false
+                    
+                    var size = CGSize.zero
+                    var pos = CGPoint.zero
+                    if let s = sizeVal { AXValueGetValue(s as! AXValue, .cgSize, &size) }
+                    if let p = posVal { AXValueGetValue(p as! AXValue, .cgPoint, &pos) }
+                    
+                    // Filter out 0x0 hidden helper panels
+                    if size.width < 50 && size.height < 50 && !isMinimized {
+                        continue
+                    }
+                    
+                    let windowTitle = title.isEmpty ? appName : title
+                    let uniqueId = CGWindowID(UInt32(pid) << 8 | UInt32(index & 0xFF))
+                    
+                    let model = WindowModel(
+                        id: uniqueId,
+                        pid: pid,
+                        appName: appName,
+                        bundleId: bundleId,
+                        appIcon: appIcon,
+                        title: windowTitle,
+                        bounds: CGRect(origin: pos, size: size),
+                        isMinimized: isMinimized,
+                        isHidden: app.isHidden,
+                        thumbnail: nil
+                    )
+                    result.append(model)
+                }
+            } else {
+                let model = WindowModel(
+                    id: CGWindowID(UInt32(pid) << 8),
+                    pid: pid,
+                    appName: appName,
+                    bundleId: bundleId,
+                    appIcon: appIcon,
+                    title: appName,
+                    bounds: .zero,
+                    isMinimized: false,
+                    isHidden: app.isHidden,
+                    thumbnail: nil
+                )
+                result.append(model)
+            }
         }
         
-        var result: [WindowModel] = []
-        let runningApps = NSWorkspace.shared.runningApplications
-        let runningAppDict = Dictionary(uniqueKeysWithValues: runningApps.map { ($0.processIdentifier, $0) })
-        
-        let ownPid = ProcessInfo.processInfo.processIdentifier
-        
-        for info in windowInfoList {
-            guard let layer = info[kCGWindowLayer as String] as? Int, layer == 0 else {
-                continue // Only normal standard application windows
+        // Put the frontmost application's other windows or the most recently used window at the beginning
+        if let frontApp = NSWorkspace.shared.frontmostApplication {
+            let frontPid = frontApp.processIdentifier
+            result.sort { (w1, w2) in
+                if w1.pid == frontPid && w2.pid != frontPid {
+                    return false
+                } else if w1.pid != frontPid && w2.pid == frontPid {
+                    return true
+                }
+                return false
             }
-            
-            guard let pid = info[kCGWindowOwnerPID as String] as? pid_t, pid != ownPid else {
-                continue
-            }
-            
-            guard let windowID = info[kCGWindowNumber as String] as? CGWindowID else {
-                continue
-            }
-            
-            let appName = (info[kCGWindowOwnerName as String] as? String) ?? "Uygulama"
-            let windowTitle = (info[kCGWindowName as String] as? String) ?? ""
-            
-            // Bounds check
-            guard let boundsDict = info[kCGWindowBounds as String] as? [String: CGFloat],
-                  let width = boundsDict["Width"],
-                  let height = boundsDict["Height"],
-                  let x = boundsDict["X"],
-                  let y = boundsDict["Y"],
-                  width > 80, height > 80 else {
-                continue // Filter out invisible 0x0 or tiny auxiliary elements
-            }
-            
-            let bounds = CGRect(x: x, y: y, width: width, height: height)
-            
-            // App info
-            let app = runningAppDict[pid]
-            if let app = app, app.activationPolicy != .regular {
-                if windowTitle.isEmpty { continue }
-            }
-            
-            let appIcon = app?.icon
-            let bundleId = app?.bundleIdentifier
-            
-            // Thumbnail
-            let thumbnail = ThumbnailCache.shared.thumbnail(for: windowID, bounds: bounds)
-            
-            let model = WindowModel(
-                id: windowID,
-                pid: pid,
-                appName: appName,
-                bundleId: bundleId,
-                appIcon: appIcon,
-                title: windowTitle.isEmpty ? appName : windowTitle,
-                bounds: bounds,
-                isMinimized: false,
-                isHidden: app?.isHidden ?? false,
-                thumbnail: thumbnail
-            )
-            
-            result.append(model)
         }
         
         return result
     }
     
-    // MARK: - Window Control Actions
+    // MARK: - Window Focus & Control
     public func focusWindow(_ window: WindowModel) {
         guard let app = NSRunningApplication(processIdentifier: window.pid) else { return }
         
@@ -99,8 +123,15 @@ public final class WindowEngine {
             for axWindow in axWindows {
                 var titleValue: AnyObject?
                 _ = AXUIElementCopyAttributeValue(axWindow, kAXTitleAttribute as CFString, &titleValue)
+                let title = (titleValue as? String) ?? ""
                 
-                if let title = titleValue as? String, (title == window.title || axWindows.count == 1) {
+                if title == window.title || axWindows.count == 1 || window.title == window.appName {
+                    var minVal: AnyObject?
+                    if AXUIElementCopyAttributeValue(axWindow, kAXMinimizedAttribute as CFString, &minVal) == .success,
+                       let isMin = minVal as? Bool, isMin {
+                        AXUIElementSetAttributeValue(axWindow, kAXMinimizedAttribute as CFString, kCFBooleanFalse)
+                    }
+                    
                     AXUIElementSetAttributeValue(axWindow, kAXMainAttribute as CFString, kCFBooleanTrue)
                     AXUIElementPerformAction(axWindow, kAXRaiseAction as CFString)
                     break
@@ -115,42 +146,15 @@ public final class WindowEngine {
         if AXUIElementCopyAttributeValue(appElement, kAXWindowsAttribute as CFString, &windowListValue) == .success,
            let axWindows = windowListValue as? [AXUIElement] {
             for axWindow in axWindows {
-                var closeButtonVal: AnyObject?
-                if AXUIElementCopyAttributeValue(axWindow, kAXCloseButtonAttribute as CFString, &closeButtonVal) == .success,
-                   let closeButton = closeButtonVal {
-                    AXUIElementPerformAction(closeButton as! AXUIElement, kAXPressAction as CFString)
-                    break
-                }
-            }
-        }
-    }
-    
-    public func minimizeWindow(_ window: WindowModel) {
-        let appElement = AXUIElementCreateApplication(window.pid)
-        var windowListValue: AnyObject?
-        if AXUIElementCopyAttributeValue(appElement, kAXWindowsAttribute as CFString, &windowListValue) == .success,
-           let axWindows = windowListValue as? [AXUIElement] {
-            for axWindow in axWindows {
-                var minimizeButtonVal: AnyObject?
-                if AXUIElementCopyAttributeValue(axWindow, kAXMinimizeButtonAttribute as CFString, &minimizeButtonVal) == .success,
-                   let minButton = minimizeButtonVal {
-                    AXUIElementPerformAction(minButton as! AXUIElement, kAXPressAction as CFString)
-                    break
-                }
-            }
-        }
-    }
-    
-    public func maximizeWindow(_ window: WindowModel) {
-        let appElement = AXUIElementCreateApplication(window.pid)
-        var windowListValue: AnyObject?
-        if AXUIElementCopyAttributeValue(appElement, kAXWindowsAttribute as CFString, &windowListValue) == .success,
-           let axWindows = windowListValue as? [AXUIElement] {
-            for axWindow in axWindows {
-                var zoomButtonVal: AnyObject?
-                if AXUIElementCopyAttributeValue(axWindow, kAXZoomButtonAttribute as CFString, &zoomButtonVal) == .success,
-                   let zoomButton = zoomButtonVal {
-                    AXUIElementPerformAction(zoomButton as! AXUIElement, kAXPressAction as CFString)
+                var titleValue: AnyObject?
+                _ = AXUIElementCopyAttributeValue(axWindow, kAXTitleAttribute as CFString, &titleValue)
+                let title = (titleValue as? String) ?? ""
+                if title == window.title || axWindows.count == 1 {
+                    var closeButtonVal: AnyObject?
+                    if AXUIElementCopyAttributeValue(axWindow, kAXCloseButtonAttribute as CFString, &closeButtonVal) == .success,
+                       let closeButton = closeButtonVal {
+                        AXUIElementPerformAction(closeButton as! AXUIElement, kAXPressAction as CFString)
+                    }
                     break
                 }
             }
@@ -161,5 +165,18 @@ public final class WindowEngine {
         if let app = NSRunningApplication(processIdentifier: window.pid) {
             app.terminate()
         }
+    }
+    
+    public func minimizeWindow(_ window: WindowModel) {
+        let appElement = AXUIElementCreateApplication(window.pid)
+        var windowListValue: AnyObject?
+        if AXUIElementCopyAttributeValue(appElement, kAXWindowsAttribute as CFString, &windowListValue) == .success,
+           let axWindows = windowListValue as? [AXUIElement], let first = axWindows.first {
+            AXUIElementSetAttributeValue(first, kAXMinimizedAttribute as CFString, kCFBooleanTrue)
+        }
+    }
+    
+    public func maximizeWindow(_ window: WindowModel) {
+        SnapEngine.shared.snapFocusedWindow(to: .maximize)
     }
 }
