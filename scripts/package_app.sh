@@ -28,4 +28,9 @@ fi
 echo "✍️ Ad-hoc code signing WinMac.app..."
 codesign --force --deep --sign - --entitlements Resources/WinMac.entitlements "$APP_DIR"
 
-echo "✅ Successfully created $APP_DIR with AppIcon!"
+# Install to /Applications
+echo "🚀 Installing WinMac.app to /Applications..."
+rm -rf /Applications/WinMac.app
+cp -R "$APP_DIR" /Applications/WinMac.app
+
+echo "✅ Successfully built, signed, and installed /Applications/WinMac.app!"

@@ -6,8 +6,8 @@ import ApplicationServices
 public final class EventTapManager: @unchecked Sendable {
     public static let shared = EventTapManager()
     
-    private var scrollEventTap: CFMachPort?
-    private var scrollRunLoopSource: CFRunLoopSource?
+    private var globalEventTap: CFMachPort?
+    private var eventRunLoopSource: CFRunLoopSource?
     private var mouseDragMonitor: Any?
     private var mouseUpMonitor: Any?
     
@@ -23,39 +23,42 @@ public final class EventTapManager: @unchecked Sendable {
     private init() {}
     
     public func start() {
-        // HotKey ve NSEvent monitor'leri Erişilebilirlik izni OLMADAN da çalışır (Rectangle mimarisi)
+        // HotKeys run independently of Accessibility
         DispatchQueue.main.async {
             HotKeyManager.shared.start()
             self.startGlobalMouseMonitors()
         }
         
-        // CGEventTap ise izin gerektirir — yoksa başlatma, PermissionsManager retry edecek
+        // CGEventTap requires Accessibility permissions
         if AXIsProcessTrusted() {
-            startScrollEventTap()
+            startUnifiedEventTap()
         } else {
             print("[WinMac] Accessibility permission not yet granted. HotKeys and monitors started, CGEventTap deferred.")
         }
     }
     
     public func startScrollEventTapIfNeeded() {
-        guard scrollEventTap == nil, AXIsProcessTrusted() else { return }
-        startScrollEventTap()
+        guard globalEventTap == nil, AXIsProcessTrusted() else { return }
+        startUnifiedEventTap()
     }
     
     public func stop() {
-        stopScrollEventTap()
+        stopUnifiedEventTap()
         stopGlobalMouseMonitors()
         print("[WinMac] All services stopped safely.")
     }
     
-    // MARK: - Dedicated LinearMouse Scroll Event Tap
-    private func startScrollEventTap() {
-        guard scrollEventTap == nil else { return }
+    // MARK: - Unified Global Event Tap (Scroll, Key, Drag, Snap)
+    private func startUnifiedEventTap() {
+        guard globalEventTap == nil else { return }
         
         let eventMask: CGEventMask = (
             (1 << CGEventType.scrollWheel.rawValue) |
             (1 << CGEventType.flagsChanged.rawValue) |
-            (1 << CGEventType.keyDown.rawValue)
+            (1 << CGEventType.keyDown.rawValue) |
+            (1 << CGEventType.leftMouseDown.rawValue) |
+            (1 << CGEventType.leftMouseDragged.rawValue) |
+            (1 << CGEventType.leftMouseUp.rawValue)
         )
         
         let callback: CGEventTapCallBack = { (proxy, type, event, refcon) -> Unmanaged<CGEvent>? in
@@ -63,7 +66,7 @@ public final class EventTapManager: @unchecked Sendable {
                 return Unmanaged.passUnretained(event)
             }
             let manager = Unmanaged<EventTapManager>.fromOpaque(refcon).takeUnretainedValue()
-            return manager.handleScrollAndKeyEvent(proxy: proxy, type: type, event: event)
+            return manager.handleSystemEvent(proxy: proxy, type: type, event: event)
         }
         
         var tap = CGEvent.tapCreate(
@@ -87,34 +90,34 @@ public final class EventTapManager: @unchecked Sendable {
         }
         
         guard let validTap = tap else {
-            print("[WinMac] Warning: Failed to create Scroll CGEventTap.")
+            print("[WinMac] Warning: Failed to create Unified EventTap.")
             return
         }
         
-        self.scrollEventTap = validTap
+        self.globalEventTap = validTap
         let source = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, validTap, 0)
-        self.scrollRunLoopSource = source
+        self.eventRunLoopSource = source
         CFRunLoopAddSource(CFRunLoopGetMain(), source, .commonModes)
         CGEvent.tapEnable(tap: validTap, enable: true)
-        print("[WinMac] Dedicated LinearMouse Scroll EventTap successfully running.")
+        print("[WinMac] Unified System EventTap successfully running.")
     }
     
-    private func stopScrollEventTap() {
-        if let tap = scrollEventTap {
+    private func stopUnifiedEventTap() {
+        if let tap = globalEventTap {
             CGEvent.tapEnable(tap: tap, enable: false)
-            if let source = scrollRunLoopSource {
+            if let source = eventRunLoopSource {
                 CFRunLoopRemoveSource(CFRunLoopGetMain(), source, .commonModes)
-                scrollRunLoopSource = nil
+                eventRunLoopSource = nil
             }
-            scrollEventTap = nil
+            globalEventTap = nil
         }
     }
     
-    // MARK: - Rectangle Global Mouse Monitors (Non-blocking Cocoa RunLoop)
+    // MARK: - Global Mouse Monitors (Supplementary backup)
     private func startGlobalMouseMonitors() {
         stopGlobalMouseMonitors()
         
-        mouseDragMonitor = NSEvent.addGlobalMonitorForEvents(matching: .leftMouseDragged) { event in
+        mouseDragMonitor = NSEvent.addGlobalMonitorForEvents(matching: .leftMouseDragged) { _ in
             let loc = NSEvent.mouseLocation
             DispatchQueue.main.async {
                 SnapEngine.shared.handleMouseDrag(point: CGPoint(x: loc.x, y: loc.y))
@@ -140,16 +143,40 @@ public final class EventTapManager: @unchecked Sendable {
     }
     
     // MARK: - Event Handler
-    private func handleScrollAndKeyEvent(proxy: CGEventTapProxy, type: CGEventType, event: CGEvent) -> Unmanaged<CGEvent>? {
-        // LinearMouse birebir: tap her durumda yeniden aktif edilir, ASLA kalıcı kapatılmaz
+    private func handleSystemEvent(proxy: CGEventTapProxy, type: CGEventType, event: CGEvent) -> Unmanaged<CGEvent>? {
+        // Re-enable tap if disabled by system timeout
         if type == .tapDisabledByUserInput || type == .tapDisabledByTimeout {
-            if let tap = scrollEventTap {
+            if let tap = globalEventTap {
                 CGEvent.tapEnable(tap: tap, enable: true)
             }
             return Unmanaged.passUnretained(event)
         }
         
-        // 1. Mouse Scroll Inversion & Modifiers (LinearMouse Engine)
+        // 1. Mouse Drag & Snap Handling
+        if type == .leftMouseDown {
+            let loc = NSEvent.mouseLocation
+            DispatchQueue.main.async {
+                SnapEngine.shared.handleMouseDown(point: CGPoint(x: loc.x, y: loc.y))
+            }
+            return Unmanaged.passUnretained(event)
+        }
+        
+        if type == .leftMouseDragged {
+            let loc = NSEvent.mouseLocation
+            DispatchQueue.main.async {
+                SnapEngine.shared.handleMouseDrag(point: CGPoint(x: loc.x, y: loc.y))
+            }
+            return Unmanaged.passUnretained(event)
+        }
+        
+        if type == .leftMouseUp {
+            DispatchQueue.main.async {
+                SnapEngine.shared.handleMouseUp()
+            }
+            return Unmanaged.passUnretained(event)
+        }
+        
+        // 2. Mouse Scroll Inversion & Modifiers (LinearMouse Engine)
         if type == .scrollWheel {
             if let modified = ScrollInverter.shared.handleScrollEvent(event: event) {
                 return Unmanaged.passUnretained(modified)
@@ -161,7 +188,7 @@ public final class EventTapManager: @unchecked Sendable {
         let flags = event.flags
         let keyCode = CGKeyCode(event.getIntegerValueField(.keyboardEventKeycode))
         
-        // 2. Modifier Key Release check (Option or Control released while Alt + Tab HUD is active)
+        // 3. Modifier Key Release check (Option or Control released while Alt + Tab HUD is active)
         if type == .flagsChanged {
             if isAltTabActive {
                 let modifierReleased: Bool
@@ -182,7 +209,7 @@ public final class EventTapManager: @unchecked Sendable {
             return Unmanaged.passUnretained(event)
         }
         
-        // 3. Alt + Tab Trigger (Option+Tab or Control+Tab configurable)
+        // 4. Alt + Tab Trigger (Option+Tab or Control+Tab configurable)
         let altTabEnabled = defaults.object(forKey: "altTabEnabled") as? Bool ?? true
         let shortcutPref = defaults.string(forKey: "switcherShortcut") ?? AltTabShortcut.optionTab.rawValue
         let isCtrlTabPref = shortcutPref == AltTabShortcut.ctrlTab.rawValue
@@ -221,7 +248,7 @@ public final class EventTapManager: @unchecked Sendable {
             }
         }
         
-        // 4. Option + V / Control + Shift + V / Command + Shift + V -> Clipboard History
+        // 5. Option + V / Control + Shift + V / Command + Shift + V -> Clipboard History
         let clipEnabled = defaults.object(forKey: "clipboardHistoryEnabled") as? Bool ?? true
         if type == .keyDown && clipEnabled {
             let isOptV = (keyCode == 9 && flags.contains(.maskAlternate) && !flags.contains(.maskControl) && !flags.contains(.maskCommand))
@@ -236,7 +263,7 @@ public final class EventTapManager: @unchecked Sendable {
             }
         }
         
-        // 5. System Shortcuts (Option + L -> Lock Screen, etc.)
+        // 6. System Shortcuts (Option + L -> Lock Screen, etc.)
         if let sysResult = SystemShortcuts.shared.handleKeyEvent(type: type, event: event) {
             if sysResult !== event {
                 return Unmanaged.passRetained(sysResult)
@@ -245,7 +272,7 @@ public final class EventTapManager: @unchecked Sendable {
             return nil
         }
         
-        // 6. Ctrl to Cmd Key Remapping (Ctrl+C/V/Z/Y/A/S/F/W/T/P/N/R)
+        // 7. Ctrl to Cmd Key Remapping (Ctrl+C/V/Z/Y/A/S/F/W/T/P/N/R)
         if let ctrlResult = CtrlToCmdMapper.shared.handleKeyEvent(type: type, event: event) {
             if ctrlResult !== event {
                 return Unmanaged.passRetained(ctrlResult)

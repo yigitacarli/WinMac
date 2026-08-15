@@ -7,6 +7,7 @@ public final class SnapOverlayController {
     
     private var panel: NSPanel?
     private var currentRect: NSRect = .zero
+    private var isHiding = false
     
     private init() {}
     
@@ -16,18 +17,21 @@ public final class SnapOverlayController {
         }
         
         guard let panel = panel else { return }
+        isHiding = false
         
-        if panel.isVisible && currentRect.equalTo(rect) {
+        if panel.isVisible && currentRect.equalTo(rect) && panel.alphaValue > 0.9 {
             return
         }
         
         self.currentRect = rect
         
-        if panel.isVisible {
+        if panel.isVisible && panel.alphaValue > 0.05 {
+            panel.orderFrontRegardless()
             NSAnimationContext.runAnimationGroup { context in
                 context.duration = 0.12
                 context.timingFunction = CAMediaTimingFunction(name: .easeOut)
                 panel.animator().setFrame(rect, display: true)
+                panel.animator().alphaValue = 1.0
             }
         } else {
             panel.setFrame(rect, display: true)
@@ -42,15 +46,19 @@ public final class SnapOverlayController {
     }
     
     public func hidePreview() {
-        guard let panel = panel, panel.isVisible else { return }
+        guard let panel = panel, panel.isVisible, !isHiding else { return }
+        isHiding = true
         self.currentRect = .zero
         
         NSAnimationContext.runAnimationGroup { context in
             context.duration = 0.1
+            context.timingFunction = CAMediaTimingFunction(name: .easeOut)
             panel.animator().alphaValue = 0.0
         } completionHandler: {
-            Task { @MainActor in
+            Task { @MainActor [weak self] in
+                guard let self = self, self.isHiding else { return }
                 panel.orderOut(nil)
+                self.isHiding = false
             }
         }
     }
@@ -65,7 +73,7 @@ public final class SnapOverlayController {
         
         p.isOpaque = false
         p.backgroundColor = .clear
-        p.level = .floating
+        p.level = NSWindow.Level(Int(CGWindowLevelForKey(.overlayWindow)))
         p.hasShadow = false
         p.ignoresMouseEvents = true
         p.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
@@ -75,17 +83,16 @@ public final class SnapOverlayController {
     }
 }
 
-// MARK: - Rectangle FootprintWindow.swift Birebir Snap Preview
+// MARK: - Modern Snap Preview Ghost View
 
 private struct PremiumSnapGhostView: View {
     var body: some View {
         ZStack {
-            // Rectangle birebir: NSColor.selectedControlColor eşdeğeri
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .fill(Color.accentColor.opacity(0.22))
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(Color.accentColor.opacity(0.18))
             
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .stroke(Color.accentColor.opacity(0.55), lineWidth: 1.5)
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(Color.accentColor.opacity(0.6), lineWidth: 1.5)
         }
         .padding(4)
     }

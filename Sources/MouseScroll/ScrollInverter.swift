@@ -12,13 +12,13 @@ public final class ScrollInverter: @unchecked Sendable {
     
     // MARK: - IOHID Dynamic Function Pointers (LinearMouse Architecture)
     private typealias IOHIDEventSystemClientCreateFunc = @convention(c) (CFAllocator?) -> UnsafeMutableRawPointer?
-    private typealias IOHIDEventSystemClientSetPropertyFunc = @convention(c) (UnsafeMutableRawPointer, CFString, CFTypeRef) -> Bool
+    private typealias IOHIDEventSystemClientSetMatchingFunc = @convention(c) (UnsafeMutableRawPointer, CFDictionary?) -> Void
     private typealias IOHIDEventSystemClientCopyServicesFunc = @convention(c) (UnsafeMutableRawPointer) -> CFArray?
     private typealias IOHIDServiceClientSetPropertyFunc = @convention(c) (UnsafeMutableRawPointer, CFString, CFTypeRef) -> Bool
     
     private var iohidHandle: UnsafeMutableRawPointer?
     private var iohidCreate: IOHIDEventSystemClientCreateFunc?
-    private var iohidClientSetProp: IOHIDEventSystemClientSetPropertyFunc?
+    private var iohidSetMatching: IOHIDEventSystemClientSetMatchingFunc?
     private var iohidCopyServices: IOHIDEventSystemClientCopyServicesFunc?
     private var iohidServiceSetProp: IOHIDServiceClientSetPropertyFunc?
     
@@ -33,8 +33,8 @@ public final class ScrollInverter: @unchecked Sendable {
         if let createSym = dlsym(handle, "IOHIDEventSystemClientCreate") {
             self.iohidCreate = unsafeBitCast(createSym, to: IOHIDEventSystemClientCreateFunc.self)
         }
-        if let setPropSym = dlsym(handle, "IOHIDEventSystemClientSetProperty") {
-            self.iohidClientSetProp = unsafeBitCast(setPropSym, to: IOHIDEventSystemClientSetPropertyFunc.self)
+        if let matchSym = dlsym(handle, "IOHIDEventSystemClientSetMatching") {
+            self.iohidSetMatching = unsafeBitCast(matchSym, to: IOHIDEventSystemClientSetMatchingFunc.self)
         }
         if let copyServicesSym = dlsym(handle, "IOHIDEventSystemClientCopyServices") {
             self.iohidCopyServices = unsafeBitCast(copyServicesSym, to: IOHIDEventSystemClientCopyServicesFunc.self)
@@ -48,7 +48,7 @@ public final class ScrollInverter: @unchecked Sendable {
     public func handleScrollEvent(event: CGEvent) -> CGEvent? {
         let defaults = UserDefaults.standard
         let invertV = defaults.object(forKey: "invertMouseWheel") as? Bool ?? true
-        let invertH = defaults.object(forKey: "invertHorizontalScroll") as? Bool ?? true
+        let invertH = defaults.object(forKey: "invertHorizontalScroll") as? Bool ?? false
         var speedMult = defaults.object(forKey: "scrollSpeedMultiplier") as? Double ?? 1.0
         
         let shiftH = defaults.object(forKey: "shiftHorizontalScrollEnabled") as? Bool ?? true
@@ -58,10 +58,14 @@ public final class ScrollInverter: @unchecked Sendable {
         let linearAccel = defaults.object(forKey: "disableMouseAcceleration") as? Bool ?? false
         let sensitivity = defaults.object(forKey: "mousePointerSensitivity") as? Double ?? 1.0
         
-        // LinearMouse LinearScrolling.swift birebir: Trackpad olaylarına dokunma
+        // 1. Strict Trackpad vs External Mouse Distinction
+        // Trackpad gestures generate continuous scroll events and have non-zero scroll/momentum phases
         let isContinuous = event.getIntegerValueField(.scrollWheelEventIsContinuous) != 0
-        if isContinuous {
-            // Bu bir trackpad/Magic Mouse jesti — müdahale etme, olduğu gibi geçir
+        let scrollPhase = event.getIntegerValueField(.scrollWheelEventScrollPhase)
+        let momentumPhase = event.getIntegerValueField(.scrollWheelEventMomentumPhase)
+        
+        if isContinuous || scrollPhase != 0 || momentumPhase != 0 {
+            // This is a Trackpad or Magic Mouse gesture — NEVER invert, pass through untouched
             return event
         }
         
@@ -78,20 +82,21 @@ public final class ScrollInverter: @unchecked Sendable {
         var fixedDeltaY = event.getDoubleValueField(.scrollWheelEventFixedPtDeltaAxis1)
         var fixedDeltaX = event.getDoubleValueField(.scrollWheelEventFixedPtDeltaAxis2)
         
+        // Ensure non-zero point deltas for notched mouse wheels
         if pointDeltaY == 0 && deltaY != 0 {
-            pointDeltaY = deltaY * 10.0
+            pointDeltaY = deltaY * 12.0
         }
         if pointDeltaX == 0 && deltaX != 0 {
-            pointDeltaX = deltaX * 10.0
+            pointDeltaX = deltaX * 12.0
         }
         if fixedDeltaY == 0 && deltaY != 0 {
-            fixedDeltaY = deltaY * 10.0
+            fixedDeltaY = deltaY * 12.0
         }
         if fixedDeltaX == 0 && deltaX != 0 {
-            fixedDeltaX = deltaX * 10.0
+            fixedDeltaX = deltaX * 12.0
         }
         
-        // 1. Cmd + Wheel -> Zoom In / Zoom Out (LinearMouse Keystroke Synthesis)
+        // 2. Cmd + Wheel -> Zoom In / Zoom Out
         if flags.contains(.maskCommand) && cmdZoom && (deltaY != 0 || pointDeltaY != 0) {
             let now = ProcessInfo.processInfo.systemUptime
             if now - lastZoomTime > 0.07 {
@@ -113,31 +118,31 @@ public final class ScrollInverter: @unchecked Sendable {
             return nil
         }
         
-        // 2. Option + Wheel -> 3x Fast Scroll
+        // 3. Option + Wheel -> 3x Fast Scroll
         if flags.contains(.maskAlternate) && optFast {
             speedMult *= 3.0
         }
         
-        // 3. Control + Wheel -> 0.3x Precision Slow Scroll
+        // 4. Control + Wheel -> 0.3x Precision Slow Scroll
         if flags.contains(.maskControl) && ctrlSlow {
             speedMult *= 0.3
         }
         
-        // 4. Invert Vertical Scroll
+        // 5. Invert Vertical Scroll for Physical Mouse
         if invertV {
             deltaY = -deltaY
             pointDeltaY = -pointDeltaY
             fixedDeltaY = -fixedDeltaY
         }
         
-        // 5. Invert Horizontal Scroll
+        // 6. Invert Horizontal Scroll (if enabled)
         if invertH {
             deltaX = -deltaX
             pointDeltaX = -pointDeltaX
             fixedDeltaX = -fixedDeltaX
         }
         
-        // 6. Apply Speed Multiplier
+        // 7. Apply Speed Multiplier
         if speedMult != 1.0 && speedMult > 0 {
             deltaY *= speedMult
             pointDeltaY *= speedMult
@@ -147,7 +152,7 @@ public final class ScrollInverter: @unchecked Sendable {
             fixedDeltaX *= speedMult
         }
         
-        // 7. Shift + Wheel -> Horizontal Scroll
+        // 8. Shift + Wheel -> Horizontal Scroll
         if flags.contains(.maskShift) && shiftH && (deltaY != 0 || pointDeltaY != 0) {
             event.setIntegerValueField(.scrollWheelEventDeltaAxis1, value: 0)
             event.setIntegerValueField(.scrollWheelEventPointDeltaAxis1, value: 0)
@@ -159,7 +164,7 @@ public final class ScrollInverter: @unchecked Sendable {
             return event
         }
         
-        // Write transformed values directly back into the CGEvent in-place
+        // Write transformed values directly back into the CGEvent
         event.setIntegerValueField(.scrollWheelEventDeltaAxis1, value: Int64(deltaY))
         event.setIntegerValueField(.scrollWheelEventPointDeltaAxis1, value: Int64(pointDeltaY))
         event.setDoubleValueField(.scrollWheelEventFixedPtDeltaAxis1, value: fixedDeltaY)
@@ -171,40 +176,42 @@ public final class ScrollInverter: @unchecked Sendable {
         return event
     }
     
-    public func handlePointerEvent(event: CGEvent) -> CGEvent? {
-        let sensitivity = UserDefaults.standard.object(forKey: "mousePointerSensitivity") as? Double ?? 1.0
-        let linearAccel = UserDefaults.standard.object(forKey: "disableMouseAcceleration") as? Bool ?? false
-        updateHardwarePointerProperties(linear: linearAccel, sensitivity: sensitivity)
-        return event
-    }
-    
-    // MARK: - Hardware Pointer Acceleration & Sensitivity (LinearMouse PointerSpeed.swift birebir)
+    // MARK: - Hardware Pointer Acceleration & Sensitivity (Linear Curve / Windows Style)
     public func updateHardwarePointerProperties(linear: Bool, sensitivity: Double) {
         guard lastLinearAccel != linear || lastPointerSensitivity != sensitivity else { return }
         lastLinearAccel = linear
         lastPointerSensitivity = sensitivity
         
-        // LinearMouse PointerSpeed.swift birebir: IOHIDEventSystemClient üzerinden tüm servislere uygula
+        // Apply hardware acceleration property to HID mouse services
         if let createFn = self.iohidCreate,
            let copyServicesFn = self.iohidCopyServices,
            let serviceSetPropFn = self.iohidServiceSetProp,
-           let client = createFn(kCFAllocatorDefault),
-           let services = copyServicesFn(client) as? [UnsafeMutableRawPointer] {
+           let client = createFn(kCFAllocatorDefault) {
             
-            for service in services {
-                if linear {
-                    // LinearMouse birebir: -1.0 as CFNumber (Double), key = "HIDMouseAcceleration"
-                    let value = -1.0 as CFNumber
-                    _ = serviceSetPropFn(service, "HIDMouseAcceleration" as CFString, value)
-                } else {
-                    // Sensitivity: 0.0 - 3.0 arası Double değer
-                    let value = sensitivity as CFNumber
-                    _ = serviceSetPropFn(service, "HIDMouseAcceleration" as CFString, value)
+            if let setMatchingFn = self.iohidSetMatching {
+                let matching: [String: Any] = [
+                    "PrimaryUsagePage": 1, // Generic Desktop
+                    "PrimaryUsage": 2       // Mouse
+                ]
+                setMatchingFn(client, matching as CFDictionary)
+            }
+            
+            if let services = copyServicesFn(client) as? [UnsafeMutableRawPointer] {
+                for service in services {
+                    if linear {
+                        // -1.0 CFNumber completely disables macOS non-linear acceleration curve
+                        let accelVal = -1.0 as CFNumber
+                        _ = serviceSetPropFn(service, "HIDMouseAcceleration" as CFString, accelVal)
+                        _ = serviceSetPropFn(service, "HIDPointerAcceleration" as CFString, accelVal)
+                    } else {
+                        let accelVal = (sensitivity * 0.8) as CFNumber
+                        _ = serviceSetPropFn(service, "HIDMouseAcceleration" as CFString, accelVal)
+                    }
                 }
             }
         }
         
-        // Global Preference Synchronization
+        // Global Preference Synchronization for macOS Pointer Scaling
         DispatchQueue.global(qos: .utility).async {
             let task = Process()
             task.launchPath = "/usr/bin/defaults"
