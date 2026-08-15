@@ -7,13 +7,20 @@
 
 ## 📌 Proje Özeti & Vizyon
 - **Proje Adı:** WinMac
-- **Mevcut Sürüm:** v4.3.0
-- **Amaç:** 
-  1. **Pencere Değiştirici (Window Switcher):** Canlı arama, 3 farklı görünüm modu, özelleştirilebilir kısayollar (Option+Tab & Control+Tab) ve 0ms gecikmeli pencere odaklama.
-  2. **Pencere Yaslama & Düzenleme (Window Snapping):** Ekran kenarlarına sürükleyerek (Aero Snap) şeffaf önizleme kutusu ve otomatik yaslama veya global Carbon kısayollarıyla pencereleri 1/2, 2/3, 1/3, çeyrek veya tam ekran hizalama, pencere boşlukları (gaps).
-  3. **Fare & Kaydırma Denetimi (Mouse & Scroll Engine):** Harici fare için standart ters kaydırma (Windows yönü), Trackpad jestlerini %100 koruyan doğal kaydırma ayrımı, Windows tarzı doğrusal (1:1) ivme kontrolü (`HIDMouseAcceleration = -1.0`), fare imleç hassasiyeti ve hızı, Cmd+Tekerlek Yakınlaştırma (Zoom), Shift+Tekerlek yatay kaydırma, Option+Tekerlek 3x hızlı kaydırma, Control+Tekerlek 0.3x hassas kaydırma.
-  4. **Otomatik Çıkış Motoru (Auto-Quit on Close):** Mac'te sol üstteki kırmızı 'X' butonuna basılıp son pencere kapandığında uygulamanın arka planda gereksiz bellek tüketmesini engelleyerek otomatik olarak sonlanmasını sağlamak (Sarı - minimize ve Cmd+H gizleme korumalı).
-  5. **Klavye Kısayolları & Pano:** Evrensel `Ctrl+C/V/Z/Y/A`, `Option+L` Ekran Kilidi, `Ctrl+Shift+Esc` Etkinlik Monitörü ve `Option+V` Pano Geçmişi.
+- **Sürüm:** v4.3.0
+- **Son Güncelleme:** 15 Ağustos 2026
+- **Ana Hedef:** macOS üzerinde Windows kullanıcılarının alıştığı akıcı deneyimi (Pencere Yaslama, LinearMouse 1:1 ivme & DPI, Alt+Tab, Pano Geçmişi, SwiftQuit) tek bir native, hafif ve modern Swift uygulamasında sunmak.
+
+---
+
+## 🚀 Son Yapılan Güncellemeler (v4.3.0 - Major Refactor):
+1. **Fare İmleç Hızı (DPI 16.16 Fixed Point) & 1:1 Doğrusal İvme:**
+   - IOKit donanım seviyesinde `HIDPointerResolution` 16.16 fixed-point (`DPI * 65536`) formatına geçirildi. Hassasiyet kaydırıcısı donanım çözünürlüğünü doğrudan ölçeklendirerek farenin hızını anında değiştiriyor.
+   - İhtiyaç duyulmayan tekerlek modifikatörleri kaldırıldı; arayüz ve çekirdek sadece ters kaydırma, yatay kaydırma ve kaydırma hızına odaklandı.
+2. **Modern Pencere Yaslama (Frosted Glass Aero Snap):**
+   - Önizleme kutusu tamamen yenilendi: Native `NSVisualEffectView` (.hudWindow) buzlu cam, akıcı yay (spring/morph) animasyonları ve yön rozetleri eklendi.
+3. **Apple Native Ayarlar Arayüzü:**
+   - AI şablonu hissi veren tüm hantal kutular ve gereksiz öğeler kaldırıldı; Apple/Raycast tarzı zarif kenar çubuğu, pastel SF Symbol rozetleri, inset kartlar ve gerçekçi klavye tuş başlıkları (keycaps) ile sıfırdan tasarlandı.
 
 ---
 
