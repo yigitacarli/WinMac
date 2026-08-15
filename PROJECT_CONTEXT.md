@@ -18,14 +18,13 @@
 
 ## 📝 Sürüm Geçmişi (Changelog)
 
-### Sürüm 4.1.0 (Güncel)
-- **LinearMouse & Rectangle Birebir Çekirdek Düzeltmeleri (6 Kritik Hata):**
-  1. **TCC İzin Guard & Servis Başlatma (#1):** `AXIsProcessTrusted()` guard'ı esnetilerek HotKey ve NSEvent global fare monitörlerinin her zaman çalışması sağlandı. `PermissionsManager` üzerinden `startScrollEventTapIfNeeded` ile izin verildiği anda CGEventTap otomatik ayağa kaldırılır.
-  2. **LinearMouse IOHID Kernel Hızlandırma (#2):** `ScrollInverter.swift` içinde property key `"HIDMouseAcceleration"` ve değer `-1.0 as CFNumber` (veya `sensitivity as CFNumber`) olarak LinearMouse `PointerSpeed.swift` ile birebir eşitlendi.
-  3. **Trackpad & Fiziksel Fare Ayrımı (#3):** `scrollWheelEventIsContinuous` kontrolü ile trackpad / Magic Mouse jestleri filtrelendi, doğal kaydırma bozulmadan sadece harici fare tekerleği işlenir hale getirildi.
-  4. **Rectangle Accessibility Sırası (#4):** `SnapEngine.swift` `setFrame` metodu Rectangle `AccessibilityElement.swift` standardında (Pozisyon → Boyut → Pozisyon) yeniden düzenlendi, Chromium ve Electron uygulamalarında kayma giderildi.
-  5. **Rectangle Footprint Snap Önizleme (#5):** `SnapOverlayController.swift` içerisindeki önizleme kutusu Rectangle `FootprintWindow.swift` ile birebir uyumlu `Color.accentColor.opacity(0.22)` ve 10 corner radius sadeliğine kavuşturuldu.
-  6. **Kesintisiz Tap Kurtarma (#6):** `EventTapManager.swift` içinde `tapDisabledByUserInput` veya `tapDisabledByTimeout` durumlarında servisler kalıcı kapatılmak yerine anında `CGEvent.tapEnable(tap, true)` ile yeniden aktif edilir.
+### Sürüm 4.2.0 (Güncel)
+- **Pencere Yaslama & Sürükleme Motoru Tamir Edildi:**
+  1. `SnapEngine.swift` içerisindeki ekran tespit mantığı `NSMouseInRect` yerine tam kapalı sınır kontrolü (`x >= minX && x <= maxX && y >= minY && y <= maxY`) ile güncellendi. Ekranın en üstüne (`maxY`) veya sağına (`maxX`) yapışıldığında yaşanan tespit düşmesi giderildi.
+  2. Pencere tespitinde pencerenin merkez noktası (`center`) ve kesişim (`intersects`) hesaplamasıyla çoklu ekran ve tek ekran ayrımı kusursuzlaştırıldı.
+  3. `handleMouseUp` sırasında `currentDragSnapTarget` asenkron bloktan önce güvene alınarak pencere bırakıldığı an yaslama tetikleyicisi güvenceye alındı.
+
+### Sürüm 4.1.0
 
 ### Sürüm 4.0.0
 

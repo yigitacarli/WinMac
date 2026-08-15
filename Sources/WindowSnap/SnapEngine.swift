@@ -42,15 +42,18 @@ public final class SnapEngine: @unchecked Sendable {
     public func handleMouseDrag(point: CGPoint) {
         guard UserDefaults.standard.object(forKey: "dragToSnapEnabled") as? Bool ?? true else { return }
         
-        let cocoaPoint = NSPoint(x: point.x, y: point.y)
-        guard let screen = NSScreen.screens.first(where: { NSMouseInRect(cocoaPoint, $0.frame, false) }) ?? NSScreen.main else {
+        let cursor = NSPoint(x: point.x, y: point.y)
+        guard let screen = NSScreen.screens.first(where: {
+            cursor.x >= $0.frame.minX && cursor.x <= $0.frame.maxX &&
+            cursor.y >= $0.frame.minY && cursor.y <= $0.frame.maxY
+        }) ?? NSScreen.main else {
             return
         }
         
         let sFrame = screen.frame
         let visibleFrame = screen.visibleFrame
-        let edgeThreshold: CGFloat = 25.0
-        let cornerThreshold: CGFloat = 70.0
+        let edgeThreshold: CGFloat = 20.0
+        let cornerThreshold: CGFloat = 75.0
         
         var targetAction: SnapAction?
         var previewRect: NSRect?
@@ -58,12 +61,12 @@ public final class SnapEngine: @unchecked Sendable {
         let halfW = visibleFrame.width / 2.0
         let halfH = visibleFrame.height / 2.0
         
-        // 1. Top Edge & Corners (Cocoa Y near sFrame.maxY)
-        if cocoaPoint.y >= sFrame.maxY - edgeThreshold {
-            if cocoaPoint.x <= sFrame.minX + cornerThreshold {
+        // 1. Top Edge & Corners (cursor.y near sFrame.maxY)
+        if cursor.y >= sFrame.maxY - edgeThreshold {
+            if cursor.x <= sFrame.minX + cornerThreshold {
                 targetAction = .topLeftQuarter
                 previewRect = NSRect(x: visibleFrame.minX, y: visibleFrame.minY + halfH, width: halfW, height: halfH)
-            } else if cocoaPoint.x >= sFrame.maxX - cornerThreshold {
+            } else if cursor.x >= sFrame.maxX - cornerThreshold {
                 targetAction = .topRightQuarter
                 previewRect = NSRect(x: visibleFrame.minX + halfW, y: visibleFrame.minY + halfH, width: halfW, height: halfH)
             } else {
@@ -71,12 +74,12 @@ public final class SnapEngine: @unchecked Sendable {
                 previewRect = visibleFrame
             }
         }
-        // 2. Bottom Edge & Corners (Cocoa Y near sFrame.minY)
-        else if cocoaPoint.y <= sFrame.minY + edgeThreshold {
-            if cocoaPoint.x <= sFrame.minX + cornerThreshold {
+        // 2. Bottom Edge & Corners (cursor.y near sFrame.minY)
+        else if cursor.y <= sFrame.minY + edgeThreshold {
+            if cursor.x <= sFrame.minX + cornerThreshold {
                 targetAction = .bottomLeftQuarter
                 previewRect = NSRect(x: visibleFrame.minX, y: visibleFrame.minY, width: halfW, height: halfH)
-            } else if cocoaPoint.x >= sFrame.maxX - cornerThreshold {
+            } else if cursor.x >= sFrame.maxX - cornerThreshold {
                 targetAction = .bottomRightQuarter
                 previewRect = NSRect(x: visibleFrame.minX + halfW, y: visibleFrame.minY, width: halfW, height: halfH)
             } else {
@@ -85,12 +88,12 @@ public final class SnapEngine: @unchecked Sendable {
             }
         }
         // 3. Left Edge
-        else if cocoaPoint.x <= sFrame.minX + edgeThreshold {
+        else if cursor.x <= sFrame.minX + edgeThreshold {
             targetAction = .leftHalf
             previewRect = NSRect(x: visibleFrame.minX, y: visibleFrame.minY, width: halfW, height: visibleFrame.height)
         }
         // 4. Right Edge
-        else if cocoaPoint.x >= sFrame.maxX - edgeThreshold {
+        else if cursor.x >= sFrame.maxX - edgeThreshold {
             targetAction = .rightHalf
             previewRect = NSRect(x: visibleFrame.minX + halfW, y: visibleFrame.minY, width: halfW, height: visibleFrame.height)
         }
@@ -110,11 +113,11 @@ public final class SnapEngine: @unchecked Sendable {
     
     public func handleMouseUp() {
         if let target = currentDragSnapTarget {
+            self.currentDragSnapTarget = nil
             DispatchQueue.main.async { [weak self] in
                 self?.snapFocusedWindow(to: target)
                 SnapOverlayController.shared.hidePreview()
             }
-            self.currentDragSnapTarget = nil
         } else {
             DispatchQueue.main.async {
                 SnapOverlayController.shared.hidePreview()
@@ -177,18 +180,19 @@ public final class SnapEngine: @unchecked Sendable {
         let appElement = AXUIElementCreateApplication(frontApp.processIdentifier)
         
         var focusedWindowVal: AnyObject?
-        guard AXUIElementCopyAttributeValue(appElement, kAXFocusedWindowAttribute as CFString, &focusedWindowVal) == .success,
-              let windowElement = focusedWindowVal as! AXUIElement? else {
-            // Fallback: try first window of front app
-            var windowsVal: AnyObject?
-            if AXUIElementCopyAttributeValue(appElement, kAXWindowsAttribute as CFString, &windowsVal) == .success,
-               let windowsList = windowsVal as? [AXUIElement], let firstWin = windowsList.first {
-                applySnap(windowElement: firstWin, appElement: appElement, frontApp: frontApp, action: action)
-            }
+        let axStatus = AXUIElementCopyAttributeValue(appElement, kAXFocusedWindowAttribute as CFString, &focusedWindowVal)
+        
+        if axStatus == .success, let windowElement = focusedWindowVal as! AXUIElement? {
+            applySnap(windowElement: windowElement, appElement: appElement, frontApp: frontApp, action: action)
             return
         }
         
-        applySnap(windowElement: windowElement, appElement: appElement, frontApp: frontApp, action: action)
+        // Fallback: try first window of front app
+        var windowsVal: AnyObject?
+        if AXUIElementCopyAttributeValue(appElement, kAXWindowsAttribute as CFString, &windowsVal) == .success,
+           let windowsList = windowsVal as? [AXUIElement], let firstWin = windowsList.first {
+            applySnap(windowElement: firstWin, appElement: appElement, frontApp: frontApp, action: action)
+        }
     }
     
     private func calculateTargetRect(for action: SnapAction, visibleFrame: CGRect) -> CGRect {
@@ -243,23 +247,50 @@ public final class SnapEngine: @unchecked Sendable {
     }
     
     private func applySnap(windowElement: AXUIElement, appElement: AXUIElement, frontApp: NSRunningApplication, action: SnapAction) {
-        guard let screen = SystemUtils.screenForApp(pid: frontApp.processIdentifier) ?? NSScreen.main else {
-            return
+        let primaryScreen = NSScreen.screens.first ?? NSScreen.main ?? NSScreen.screens[0]
+        let primaryMaxY = primaryScreen.frame.maxY
+        
+        var screen: NSScreen = primaryScreen
+        
+        var posVal: AnyObject?
+        var sizeVal: AnyObject?
+        if AXUIElementCopyAttributeValue(windowElement, kAXPositionAttribute as CFString, &posVal) == .success,
+           AXUIElementCopyAttributeValue(windowElement, kAXSizeAttribute as CFString, &sizeVal) == .success,
+           let pVal = posVal, let sVal = sizeVal {
+            var pt = CGPoint.zero
+            var sz = CGSize.zero
+            AXValueGetValue(pVal as! AXValue, .cgPoint, &pt)
+            AXValueGetValue(sVal as! AXValue, .cgSize, &sz)
+            
+            let cocoaWinRect = CGRect(
+                x: pt.x,
+                y: primaryMaxY - (pt.y + sz.height),
+                width: sz.width,
+                height: sz.height
+            )
+            let center = CGPoint(x: cocoaWinRect.midX, y: cocoaWinRect.midY)
+            
+            if let matchedScreen = NSScreen.screens.first(where: {
+                center.x >= $0.frame.minX && center.x <= $0.frame.maxX &&
+                center.y >= $0.frame.minY && center.y <= $0.frame.maxY
+            }) ?? NSScreen.screens.first(where: { $0.frame.intersects(cocoaWinRect) }) {
+                screen = matchedScreen
+            }
         }
         
         let visibleFrame = screen.visibleFrame
-        let primaryMaxY = NSScreen.screens.first?.frame.maxY ?? NSScreen.screens[0].frame.height
         
         // Handle expand / shrink
         if action == .expandSize || action == .shrinkSize {
-            var sizeVal: AnyObject?
-            var posVal: AnyObject?
-            if AXUIElementCopyAttributeValue(windowElement, kAXSizeAttribute as CFString, &sizeVal) == .success,
-               AXUIElementCopyAttributeValue(windowElement, kAXPositionAttribute as CFString, &posVal) == .success {
+            var sizeVal2: AnyObject?
+            var posVal2: AnyObject?
+            if AXUIElementCopyAttributeValue(windowElement, kAXSizeAttribute as CFString, &sizeVal2) == .success,
+               AXUIElementCopyAttributeValue(windowElement, kAXPositionAttribute as CFString, &posVal2) == .success,
+               let sVal2 = sizeVal2, let pVal2 = posVal2 {
                 var currentSize = CGSize.zero
                 var currentPos = CGPoint.zero
-                AXValueGetValue(sizeVal as! AXValue, .cgSize, &currentSize)
-                AXValueGetValue(posVal as! AXValue, .cgPoint, &currentPos)
+                AXValueGetValue(sVal2 as! AXValue, .cgSize, &currentSize)
+                AXValueGetValue(pVal2 as! AXValue, .cgPoint, &currentPos)
                 
                 let scale: CGFloat = (action == .expandSize) ? 1.1 : 0.9
                 let newW = min(visibleFrame.width, currentSize.width * scale)
@@ -318,13 +349,8 @@ public final class SnapEngine: @unchecked Sendable {
         let screens = NSScreen.screens
         guard screens.count > 1 else { return }
         
-        guard let currentScreen = SystemUtils.screenForApp(pid: frontApp.processIdentifier),
-              let currentIndex = screens.firstIndex(of: currentScreen) else {
-            return
-        }
-        
-        let nextIndex = (currentIndex + direction + screens.count) % screens.count
-        let targetScreen = screens[nextIndex]
+        let primaryScreen = screens.first ?? NSScreen.main ?? screens[0]
+        let primaryMaxY = primaryScreen.frame.maxY
         
         let appElement = AXUIElementCreateApplication(frontApp.processIdentifier)
         var focusedWindowVal: AnyObject?
@@ -333,10 +359,38 @@ public final class SnapEngine: @unchecked Sendable {
             return
         }
         
-        let targetFrame = targetScreen.visibleFrame
-        let primaryHeight = screens[0].frame.height
+        var currentScreen = primaryScreen
+        var posVal: AnyObject?
+        var sizeVal: AnyObject?
+        if AXUIElementCopyAttributeValue(windowElement, kAXPositionAttribute as CFString, &posVal) == .success,
+           AXUIElementCopyAttributeValue(windowElement, kAXSizeAttribute as CFString, &sizeVal) == .success,
+           let pVal = posVal, let sVal = sizeVal {
+            var pt = CGPoint.zero
+            var sz = CGSize.zero
+            AXValueGetValue(pVal as! AXValue, .cgPoint, &pt)
+            AXValueGetValue(sVal as! AXValue, .cgSize, &sz)
+            
+            let cocoaWinRect = CGRect(
+                x: pt.x,
+                y: primaryMaxY - (pt.y + sz.height),
+                width: sz.width,
+                height: sz.height
+            )
+            let center = CGPoint(x: cocoaWinRect.midX, y: cocoaWinRect.midY)
+            if let matched = screens.first(where: {
+                center.x >= $0.frame.minX && center.x <= $0.frame.maxX &&
+                center.y >= $0.frame.minY && center.y <= $0.frame.maxY
+            }) {
+                currentScreen = matched
+            }
+        }
         
-        let origin = CGPoint(x: targetFrame.minX + 40, y: primaryHeight - targetFrame.maxY + 40)
+        guard let currentIndex = screens.firstIndex(of: currentScreen) else { return }
+        let nextIndex = (currentIndex + direction + screens.count) % screens.count
+        let targetScreen = screens[nextIndex]
+        
+        let targetFrame = targetScreen.visibleFrame
+        let origin = CGPoint(x: targetFrame.minX + 40, y: primaryMaxY - targetFrame.maxY + 40)
         let size = CGSize(width: targetFrame.width * 0.7, height: targetFrame.height * 0.7)
         
         setFrame(windowElement: windowElement, appElement: appElement, position: origin, size: size)
