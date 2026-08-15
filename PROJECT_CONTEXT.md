@@ -18,12 +18,16 @@
 
 ## 📝 Sürüm Geçmişi (Changelog)
 
-### Sürüm 4.0.0 (Güncel)
-- **Rectangle Pro Standardında Donuk Cam Önizleme:** `SnapOverlayController.swift` içerisindeki neon mavi tasarım kaldırılarak macOS Sequoia ve Rectangle Pro standartlarında koyu buzlu cam (`VisualEffectBlur`), transparan dolgu ve beyaz mikro çerçeve uygulandı.
-- **Doğru Ekran Koordinatlarıyla Aero Snap:** `SnapEngine.swift` içerisindeki Quartz/Cocoa koordinat uyuşmazlığı düzeltildi. Fare ekranın kenarına veya köşesine götürüldüğünde anında ve hatasız algılanır.
-- **Ayrık & Kesintisiz Olay Mimarisi (Timeout Önleme):** Yüksek frekanslı `mouseMoved` olayları aktif `CGEventTap` filtresinden çıkarılarak Cocoa'nın yerel `NSEvent.addGlobalMonitorForEvents` seviyesine taşındı. Böylece macOS WindowServer'ın EventTap'i kapatması (`kCGEventTapDisabledByTimeout`) tamamen engellendi; LinearMouse kaydırma ve zoom motoru 7/24 kesintisiz çalışır hale getirildi.
+### Sürüm 4.1.0 (Güncel)
+- **LinearMouse & Rectangle Birebir Çekirdek Düzeltmeleri (6 Kritik Hata):**
+  1. **TCC İzin Guard & Servis Başlatma (#1):** `AXIsProcessTrusted()` guard'ı esnetilerek HotKey ve NSEvent global fare monitörlerinin her zaman çalışması sağlandı. `PermissionsManager` üzerinden `startScrollEventTapIfNeeded` ile izin verildiği anda CGEventTap otomatik ayağa kaldırılır.
+  2. **LinearMouse IOHID Kernel Hızlandırma (#2):** `ScrollInverter.swift` içinde property key `"HIDMouseAcceleration"` ve değer `-1.0 as CFNumber` (veya `sensitivity as CFNumber`) olarak LinearMouse `PointerSpeed.swift` ile birebir eşitlendi.
+  3. **Trackpad & Fiziksel Fare Ayrımı (#3):** `scrollWheelEventIsContinuous` kontrolü ile trackpad / Magic Mouse jestleri filtrelendi, doğal kaydırma bozulmadan sadece harici fare tekerleği işlenir hale getirildi.
+  4. **Rectangle Accessibility Sırası (#4):** `SnapEngine.swift` `setFrame` metodu Rectangle `AccessibilityElement.swift` standardında (Pozisyon → Boyut → Pozisyon) yeniden düzenlendi, Chromium ve Electron uygulamalarında kayma giderildi.
+  5. **Rectangle Footprint Snap Önizleme (#5):** `SnapOverlayController.swift` içerisindeki önizleme kutusu Rectangle `FootprintWindow.swift` ile birebir uyumlu `Color.accentColor.opacity(0.22)` ve 10 corner radius sadeliğine kavuşturuldu.
+  6. **Kesintisiz Tap Kurtarma (#6):** `EventTapManager.swift` içinde `tapDisabledByUserInput` veya `tapDisabledByTimeout` durumlarında servisler kalıcı kapatılmak yerine anında `CGEvent.tapEnable(tap, true)` ile yeniden aktif edilir.
 
-### Sürüm 3.9.0
+### Sürüm 4.0.0
 
 ### Sürüm 3.8.0
 

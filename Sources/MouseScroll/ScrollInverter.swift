@@ -58,6 +58,13 @@ public final class ScrollInverter: @unchecked Sendable {
         let linearAccel = defaults.object(forKey: "disableMouseAcceleration") as? Bool ?? false
         let sensitivity = defaults.object(forKey: "mousePointerSensitivity") as? Double ?? 1.0
         
+        // LinearMouse LinearScrolling.swift birebir: Trackpad olaylarına dokunma
+        let isContinuous = event.getIntegerValueField(.scrollWheelEventIsContinuous) != 0
+        if isContinuous {
+            // Bu bir trackpad/Magic Mouse jesti — müdahale etme, olduğu gibi geçir
+            return event
+        }
+        
         // Sync hardware pointer acceleration and sensitivity in real time
         updateHardwarePointerProperties(linear: linearAccel, sensitivity: sensitivity)
         
@@ -171,32 +178,33 @@ public final class ScrollInverter: @unchecked Sendable {
         return event
     }
     
-    // MARK: - Hardware Pointer Acceleration & Sensitivity (IOHID & System Defaults)
+    // MARK: - Hardware Pointer Acceleration & Sensitivity (LinearMouse PointerSpeed.swift birebir)
     public func updateHardwarePointerProperties(linear: Bool, sensitivity: Double) {
         guard lastLinearAccel != linear || lastPointerSensitivity != sensitivity else { return }
         lastLinearAccel = linear
         lastPointerSensitivity = sensitivity
         
-        // 1. Direct Kernel IOHID Hardware Property Setting (0ms Latency)
+        // LinearMouse PointerSpeed.swift birebir: IOHIDEventSystemClient üzerinden tüm servislere uygula
         if let createFn = self.iohidCreate,
-           let setPropFn = self.iohidClientSetProp,
-           let client = createFn(kCFAllocatorDefault) {
+           let copyServicesFn = self.iohidCopyServices,
+           let serviceSetPropFn = self.iohidServiceSetProp,
+           let client = createFn(kCFAllocatorDefault),
+           let services = copyServicesFn(client) as? [UnsafeMutableRawPointer] {
             
-            // Linear acceleration: -65536 is -1.0 in 16.16 fixed point (disables acceleration)
-            let accelVal: Int32 = linear ? -65536 : Int32(sensitivity * 65536.0)
-            _ = setPropFn(client, "HIDPointerAcceleration" as CFString, accelVal as NSNumber)
-            _ = setPropFn(client, "HIDPointerResolution" as CFString, Int32(sensitivity * 400.0) as NSNumber)
-            
-            if let copyServicesFn = self.iohidCopyServices,
-               let serviceSetPropFn = self.iohidServiceSetProp,
-               let services = copyServicesFn(client) as? [UnsafeMutableRawPointer] {
-                for s in services {
-                    _ = serviceSetPropFn(s, "HIDPointerAcceleration" as CFString, accelVal as NSNumber)
+            for service in services {
+                if linear {
+                    // LinearMouse birebir: -1.0 as CFNumber (Double), key = "HIDMouseAcceleration"
+                    let value = -1.0 as CFNumber
+                    _ = serviceSetPropFn(service, "HIDMouseAcceleration" as CFString, value)
+                } else {
+                    // Sensitivity: 0.0 - 3.0 arası Double değer
+                    let value = sensitivity as CFNumber
+                    _ = serviceSetPropFn(service, "HIDMouseAcceleration" as CFString, value)
                 }
             }
         }
         
-        // 2. Global Preference Synchronization
+        // Global Preference Synchronization
         DispatchQueue.global(qos: .utility).async {
             let task = Process()
             task.launchPath = "/usr/bin/defaults"

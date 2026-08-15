@@ -75,38 +75,18 @@ public final class SnapOverlayController {
     }
 }
 
-// MARK: - Rectangle Pro / Native macOS Sequoia Translucent Frosted Glass Ghost View
+// MARK: - Rectangle FootprintWindow.swift Birebir Snap Preview
 
 private struct PremiumSnapGhostView: View {
     var body: some View {
         ZStack {
-            // Frosted backdrop
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(Color.black.opacity(0.20))
-                .background(
-                    VisualEffectBlur(material: .fullScreenUI, blendingMode: .withinWindow)
-                        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                )
+            // Rectangle birebir: NSColor.selectedControlColor eşdeğeri
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(Color.accentColor.opacity(0.22))
             
-            // Subtle translucent fill
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(Color.white.opacity(0.08))
-            
-            // Crisp refined hairline border
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .stroke(
-                    LinearGradient(
-                        colors: [
-                            Color.white.opacity(0.40),
-                            Color.white.opacity(0.15)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
-                    lineWidth: 1.5
-                )
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(Color.accentColor.opacity(0.55), lineWidth: 1.5)
         }
-        .padding(8)
-        .shadow(color: Color.black.opacity(0.35), radius: 24, y: 6)
+        .padding(4)
     }
 }

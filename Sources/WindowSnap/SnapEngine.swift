@@ -294,17 +294,18 @@ public final class SnapEngine: @unchecked Sendable {
         var s = size
         var p = position
         
-        // 1. Set size first
-        if let sizeVal = AXValueCreate(.cgSize, &s) {
-            AXUIElementSetAttributeValue(windowElement, kAXSizeAttribute as CFString, sizeVal)
-        }
-        // 2. Set position
+        // Rectangle birebir sıra: pozisyon → boyut → pozisyon (Chrome/Electron uyumluluğu)
+        // 1. Set position first
         if let posVal = AXValueCreate(.cgPoint, &p) {
             AXUIElementSetAttributeValue(windowElement, kAXPositionAttribute as CFString, posVal)
         }
-        // 3. Set size again to ensure constraints
+        // 2. Set size
         if let sizeVal = AXValueCreate(.cgSize, &s) {
             AXUIElementSetAttributeValue(windowElement, kAXSizeAttribute as CFString, sizeVal)
+        }
+        // 3. Set position again to compensate for size constraints
+        if let posVal = AXValueCreate(.cgPoint, &p) {
+            AXUIElementSetAttributeValue(windowElement, kAXPositionAttribute as CFString, posVal)
         }
         
         if hasEnhancedUI {

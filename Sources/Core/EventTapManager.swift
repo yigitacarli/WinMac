@@ -23,18 +23,22 @@ public final class EventTapManager: @unchecked Sendable {
     private init() {}
     
     public func start() {
-        guard AXIsProcessTrusted() else {
-            print("[WinMac] Cannot start EventTap: Accessibility permission not granted.")
-            return
-        }
-        
-        // 1. Start Carbon HotKeys for global window snapping (Rectangle architecture)
+        // HotKey ve NSEvent monitor'leri Erişilebilirlik izni OLMADAN da çalışır (Rectangle mimarisi)
         DispatchQueue.main.async {
             HotKeyManager.shared.start()
             self.startGlobalMouseMonitors()
         }
         
-        // 2. Start dedicated LinearMouse Scroll Wheel Tap (ONLY scrollWheel and flagsChanged to guarantee 0 timeouts)
+        // CGEventTap ise izin gerektirir — yoksa başlatma, PermissionsManager retry edecek
+        if AXIsProcessTrusted() {
+            startScrollEventTap()
+        } else {
+            print("[WinMac] Accessibility permission not yet granted. HotKeys and monitors started, CGEventTap deferred.")
+        }
+    }
+    
+    public func startScrollEventTapIfNeeded() {
+        guard scrollEventTap == nil, AXIsProcessTrusted() else { return }
         startScrollEventTap()
     }
     
@@ -112,11 +116,15 @@ public final class EventTapManager: @unchecked Sendable {
         
         mouseDragMonitor = NSEvent.addGlobalMonitorForEvents(matching: .leftMouseDragged) { event in
             let loc = NSEvent.mouseLocation
-            SnapEngine.shared.handleMouseDrag(point: CGPoint(x: loc.x, y: loc.y))
+            DispatchQueue.main.async {
+                SnapEngine.shared.handleMouseDrag(point: CGPoint(x: loc.x, y: loc.y))
+            }
         }
         
         mouseUpMonitor = NSEvent.addGlobalMonitorForEvents(matching: .leftMouseUp) { _ in
-            SnapEngine.shared.handleMouseUp()
+            DispatchQueue.main.async {
+                SnapEngine.shared.handleMouseUp()
+            }
         }
     }
     
@@ -133,16 +141,10 @@ public final class EventTapManager: @unchecked Sendable {
     
     // MARK: - Event Handler
     private func handleScrollAndKeyEvent(proxy: CGEventTapProxy, type: CGEventType, event: CGEvent) -> Unmanaged<CGEvent>? {
-        if type == .tapDisabledByUserInput {
-            self.stop()
-            return Unmanaged.passUnretained(event)
-        }
-        
-        if type == .tapDisabledByTimeout {
-            if AXIsProcessTrusted(), let tap = scrollEventTap {
+        // LinearMouse birebir: tap her durumda yeniden aktif edilir, ASLA kalıcı kapatılmaz
+        if type == .tapDisabledByUserInput || type == .tapDisabledByTimeout {
+            if let tap = scrollEventTap {
                 CGEvent.tapEnable(tap: tap, enable: true)
-            } else {
-                self.stop()
             }
             return Unmanaged.passUnretained(event)
         }
