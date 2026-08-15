@@ -6,11 +6,7 @@ import IOKit
 public final class ScrollInverter: @unchecked Sendable {
     public static let shared = ScrollInverter()
     
-    private var lastZoomTime: TimeInterval = 0
-    private var lastLinearAccel: Bool?
-    private var lastPointerSensitivity: Double?
-    
-    // MARK: - IOHID Dynamic Function Pointers (LinearMouse Architecture)
+    // MARK: - IOHID Dynamic Function Pointers
     private typealias IOHIDEventSystemClientCreateFunc = @convention(c) (CFAllocator?) -> UnsafeMutableRawPointer?
     private typealias IOHIDEventSystemClientCopyServicesFunc = @convention(c) (UnsafeMutableRawPointer) -> CFArray?
     private typealias IOHIDServiceClientSetPropertyFunc = @convention(c) (UnsafeRawPointer, CFString, CFTypeRef) -> Bool
@@ -52,23 +48,17 @@ public final class ScrollInverter: @unchecked Sendable {
         let defaults = UserDefaults.standard
         let invertV = defaults.object(forKey: "invertMouseWheel") as? Bool ?? false
         let invertH = defaults.object(forKey: "invertHorizontalScroll") as? Bool ?? false
-        var speedMult = defaults.object(forKey: "scrollSpeedMultiplier") as? Double ?? 1.0
-        
-        let shiftH = defaults.object(forKey: "shiftHorizontalScrollEnabled") as? Bool ?? true
-        let cmdZoom = defaults.object(forKey: "cmdZoomScrollEnabled") as? Bool ?? true
-        let optFast = defaults.object(forKey: "optionFastScrollEnabled") as? Bool ?? true
-        let ctrlSlow = defaults.object(forKey: "ctrlSlowScrollEnabled") as? Bool ?? true
+        let speedMult = defaults.object(forKey: "scrollSpeedMultiplier") as? Double ?? 1.0
         
         // 1. Strict Trackpad vs External Physical Mouse Distinction
         // On macOS: Trackpads & Touch surfaces ALWAYS have scrollWheelEventIsContinuous != 0.
         // Physical notched mouse wheels ALWAYS have scrollWheelEventIsContinuous == 0.
         let isContinuous = event.getIntegerValueField(.scrollWheelEventIsContinuous) != 0
         if isContinuous {
-            // Trackpad / Magic Mouse touch gesture — DO NOT MODIFY, return as-is for natural scroll
+            // Trackpad touch gesture — DO NOT MODIFY, return as-is for natural scroll
             return event
         }
         
-        let flags = event.flags
         var deltaY = event.getIntegerValueField(.scrollWheelEventDeltaAxis1)
         var deltaX = event.getIntegerValueField(.scrollWheelEventDeltaAxis2)
         
@@ -92,53 +82,21 @@ public final class ScrollInverter: @unchecked Sendable {
             fixedDeltaX = Double(deltaX) * 12.0
         }
         
-        // 2. Cmd + Wheel -> Zoom In / Zoom Out
-        if flags.contains(.maskCommand) && cmdZoom && (deltaY != 0 || pointDeltaY != 0) {
-            let now = ProcessInfo.processInfo.systemUptime
-            if now - lastZoomTime > 0.07 {
-                lastZoomTime = now
-                let isUp = (deltaY != 0 ? deltaY > 0 : pointDeltaY > 0)
-                let zoomIn = invertV ? !isUp : isUp
-                
-                // Key 24 is '+ / =', Key 27 is '-'
-                let keyCode: CGKeyCode = zoomIn ? 24 : 27
-                let source = CGEventSource(stateID: .hidSystemState)
-                if let keyDown = CGEvent(keyboardEventSource: source, virtualKey: keyCode, keyDown: true),
-                   let keyUp = CGEvent(keyboardEventSource: source, virtualKey: keyCode, keyDown: false) {
-                    keyDown.flags = .maskCommand
-                    keyUp.flags = .maskCommand
-                    keyDown.post(tap: .cgSessionEventTap)
-                    keyUp.post(tap: .cgSessionEventTap)
-                }
-            }
-            return nil
-        }
-        
-        // 3. Option + Wheel -> 3x Fast Scroll
-        if flags.contains(.maskAlternate) && optFast {
-            speedMult *= 3.0
-        }
-        
-        // 4. Control + Wheel -> 0.3x Precision Slow Scroll
-        if flags.contains(.maskControl) && ctrlSlow {
-            speedMult *= 0.3
-        }
-        
-        // 5. Invert Vertical Scroll for Physical Mouse (if enabled)
+        // 2. Invert Vertical Scroll for Physical Mouse (if enabled)
         if invertV {
             deltaY = -deltaY
             pointDeltaY = -pointDeltaY
             fixedDeltaY = -fixedDeltaY
         }
         
-        // 6. Invert Horizontal Scroll (if enabled)
+        // 3. Invert Horizontal Scroll (if enabled)
         if invertH {
             deltaX = -deltaX
             pointDeltaX = -pointDeltaX
             fixedDeltaX = -fixedDeltaX
         }
         
-        // 7. Apply Speed Multiplier
+        // 4. Apply Speed Multiplier
         if speedMult != 1.0 && speedMult > 0 {
             deltaY = Int64(Double(deltaY) * speedMult)
             pointDeltaY = Int64(Double(pointDeltaY) * speedMult)
@@ -146,18 +104,6 @@ public final class ScrollInverter: @unchecked Sendable {
             deltaX = Int64(Double(deltaX) * speedMult)
             pointDeltaX = Int64(Double(pointDeltaX) * speedMult)
             fixedDeltaX = fixedDeltaX * speedMult
-        }
-        
-        // 8. Shift + Wheel -> Horizontal Scroll
-        if flags.contains(.maskShift) && shiftH && (deltaY != 0 || pointDeltaY != 0) {
-            event.setIntegerValueField(.scrollWheelEventDeltaAxis1, value: 0)
-            event.setIntegerValueField(.scrollWheelEventPointDeltaAxis1, value: 0)
-            event.setDoubleValueField(.scrollWheelEventFixedPtDeltaAxis1, value: 0.0)
-            
-            event.setIntegerValueField(.scrollWheelEventDeltaAxis2, value: deltaY)
-            event.setIntegerValueField(.scrollWheelEventPointDeltaAxis2, value: pointDeltaY)
-            event.setDoubleValueField(.scrollWheelEventFixedPtDeltaAxis2, value: fixedDeltaY)
-            return event
         }
         
         // Write transformed values back into the CGEvent
@@ -172,13 +118,15 @@ public final class ScrollInverter: @unchecked Sendable {
         return event
     }
     
-    // MARK: - Hardware Pointer Acceleration & Sensitivity (Linear 1:1 Response / Windows Style)
+    // MARK: - Hardware Pointer Acceleration & Sensitivity (Linear 1:1 Response)
     public func updateHardwarePointerProperties(linear: Bool, sensitivity: Double) {
-        lastLinearAccel = linear
-        lastPointerSensitivity = sensitivity
-        
-        let baseResolution: Double = 800.0
-        let targetResolution = max(100.0, baseResolution / sensitivity)
+        // Base DPI in macOS IOHID is represented in 16.16 fixed point format (DPI * 65536)
+        // Standard macOS base resolution is ~400 DPI (400 * 65536 = 26214400)
+        // Higher sensitivity -> Lower DPI value -> Cursor moves faster
+        // Lower sensitivity -> Higher DPI value -> Cursor moves slower & with high precision
+        let baseDPI: Double = 400.0
+        let targetDPI = max(80.0, baseDPI / sensitivity)
+        let fixedPointResolution = Int(targetDPI * 65536.0)
         
         // 1. Apply hardware acceleration & resolution properties directly to all external pointer services
         if let createFn = self.iohidCreate,
@@ -209,7 +157,7 @@ public final class ScrollInverter: @unchecked Sendable {
                         
                         if !isInternal && (isExternalTransport || isMouseProduct || isPointerUsage) {
                             if linear {
-                                // -1.0 disables macOS non-linear acceleration curve
+                                // -1.0 disables macOS non-linear acceleration curve for 1:1 raw input
                                 let accelVal = -1.0 as CFNumber
                                 _ = serviceSetPropFn(service, "HIDMouseAcceleration" as CFString, accelVal)
                                 _ = serviceSetPropFn(service, "HIDPointerAcceleration" as CFString, accelVal)
@@ -219,7 +167,7 @@ public final class ScrollInverter: @unchecked Sendable {
                                 _ = serviceSetPropFn(service, "HIDPointerAcceleration" as CFString, accelVal)
                             }
                             
-                            let resVal = targetResolution as CFNumber
+                            let resVal = fixedPointResolution as CFNumber
                             _ = serviceSetPropFn(service, "HIDPointerResolution" as CFString, resVal)
                         }
                     }
@@ -227,7 +175,7 @@ public final class ScrollInverter: @unchecked Sendable {
             }
         }
         
-        // 2. Global Preference Synchronization for macOS Pointer Scaling
+        // 2. Global macOS mouse scaling preference sync
         DispatchQueue.global(qos: .utility).async {
             let task = Process()
             task.launchPath = "/usr/bin/defaults"

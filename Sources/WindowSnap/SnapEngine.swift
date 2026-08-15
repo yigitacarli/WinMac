@@ -117,8 +117,8 @@ public final class SnapEngine: @unchecked Sendable {
         
         self.currentDragSnapTarget = targetAction
         
-        if let preview = previewRect {
-            SnapOverlayController.shared.showPreview(for: preview)
+        if let preview = previewRect, let action = targetAction {
+            SnapOverlayController.shared.showPreview(for: preview, action: action)
         } else {
             SnapOverlayController.shared.hidePreview()
         }

@@ -1,24 +1,41 @@
 import Foundation
-import SwiftUI
 import Combine
+import Cocoa
+import CoreGraphics
 
-public enum SwitcherStyle: String, CaseIterable, Identifiable, Codable, Sendable {
-    case icons = "icons"
+public enum SwitcherStyle: String, CaseIterable, Identifiable, Sendable {
     case thumbnails = "thumbnails"
-    case titles = "titles"
+    case icons = "icons"
+    case compact = "compact"
+    case list = "list"
     
     public var id: String { rawValue }
     
     public var title: String {
         switch self {
-        case .icons: return "Uygulama Simgeleri & Kartlar (Icons)"
-        case .thumbnails: return "Geniş Kartlar (Thumbnails)"
-        case .titles: return "Kompakt Liste (Titles)"
+        case .thumbnails: return "Pencere Önizlemeleri"
+        case .icons: return "Simgeler (Büyük)"
+        case .compact: return "Kompakt Izgara"
+        case .list: return "Ayrıntılı Liste"
         }
     }
 }
 
-public enum SwitcherDisplayMode: String, CaseIterable, Identifiable, Codable, Sendable {
+public enum AltTabShortcut: String, CaseIterable, Identifiable, Sendable {
+    case optionTab = "optionTab"
+    case ctrlTab = "ctrlTab"
+    
+    public var id: String { rawValue }
+    
+    public var title: String {
+        switch self {
+        case .optionTab: return "⌥ Option + Tab"
+        case .ctrlTab: return "⌃ Control + Tab"
+        }
+    }
+}
+
+public enum SwitcherDisplayMode: String, CaseIterable, Identifiable, Sendable {
     case cursorDisplay = "cursorDisplay"
     case activeAppDisplay = "activeAppDisplay"
     case allDisplays = "allDisplays"
@@ -27,23 +44,9 @@ public enum SwitcherDisplayMode: String, CaseIterable, Identifiable, Codable, Se
     
     public var title: String {
         switch self {
-        case .cursorDisplay: return "Fare İmlecinin Olduğu Ekran"
-        case .activeAppDisplay: return "Aktif Pencerenin Olduğu Ekran"
-        case .allDisplays: return "Tüm Ekranlar"
-        }
-    }
-}
-
-public enum AltTabShortcut: String, CaseIterable, Identifiable, Codable, Sendable {
-    case optionTab = "Option + Tab (⌥ + Tab)"
-    case ctrlTab = "Control + Tab (⌃ + Tab)"
-    
-    public var id: String { rawValue }
-    
-    public var title: String {
-        switch self {
-        case .optionTab: return "Option + Tab (Alt + Tab)"
-        case .ctrlTab: return "Control + Tab (⌃ + Tab)"
+        case .cursorDisplay: return "İmlecin Olduğu Ekranda"
+        case .activeAppDisplay: return "Aktif Uygulama Ekranında"
+        case .allDisplays: return "Tüm Ekranlarda Aynı Anda"
         }
     }
 }
@@ -103,9 +106,6 @@ public final class AppSettings: ObservableObject {
     @Published public var invertHorizontalScroll: Bool {
         didSet { defaults.set(invertHorizontalScroll, forKey: "invertHorizontalScroll") }
     }
-    @Published public var smoothScrollEnabled: Bool {
-        didSet { defaults.set(smoothScrollEnabled, forKey: "smoothScrollEnabled") }
-    }
     @Published public var disableMouseAcceleration: Bool {
         didSet {
             defaults.set(disableMouseAcceleration, forKey: "disableMouseAcceleration")
@@ -115,26 +115,11 @@ public final class AppSettings: ObservableObject {
     @Published public var scrollSpeedMultiplier: Double {
         didSet { defaults.set(scrollSpeedMultiplier, forKey: "scrollSpeedMultiplier") }
     }
-    @Published public var linesPerScrollTick: Int {
-        didSet { defaults.set(linesPerScrollTick, forKey: "linesPerScrollTick") }
-    }
-    @Published public var shiftHorizontalScrollEnabled: Bool {
-        didSet { defaults.set(shiftHorizontalScrollEnabled, forKey: "shiftHorizontalScrollEnabled") }
-    }
-    @Published public var cmdZoomScrollEnabled: Bool {
-        didSet { defaults.set(cmdZoomScrollEnabled, forKey: "cmdZoomScrollEnabled") }
-    }
-    @Published public var optionFastScrollEnabled: Bool {
-        didSet { defaults.set(optionFastScrollEnabled, forKey: "optionFastScrollEnabled") }
-    }
     @Published public var mousePointerSensitivity: Double {
         didSet {
             defaults.set(mousePointerSensitivity, forKey: "mousePointerSensitivity")
             ScrollInverter.shared.updateHardwarePointerProperties(linear: disableMouseAcceleration, sensitivity: mousePointerSensitivity)
         }
-    }
-    @Published public var ctrlSlowScrollEnabled: Bool {
-        didSet { defaults.set(ctrlSlowScrollEnabled, forKey: "ctrlSlowScrollEnabled") }
     }
     
     // MARK: - Keyboard & Muscle Memory Settings
@@ -206,14 +191,8 @@ public final class AppSettings: ObservableObject {
         
         self.invertMouseWheel = defaults.object(forKey: "invertMouseWheel") as? Bool ?? false
         self.invertHorizontalScroll = defaults.object(forKey: "invertHorizontalScroll") as? Bool ?? false
-        self.smoothScrollEnabled = defaults.object(forKey: "smoothScrollEnabled") as? Bool ?? true
         self.disableMouseAcceleration = defaults.object(forKey: "disableMouseAcceleration") as? Bool ?? false
         self.scrollSpeedMultiplier = defaults.object(forKey: "scrollSpeedMultiplier") as? Double ?? 1.0
-        self.linesPerScrollTick = defaults.object(forKey: "linesPerScrollTick") as? Int ?? 3
-        self.shiftHorizontalScrollEnabled = defaults.object(forKey: "shiftHorizontalScrollEnabled") as? Bool ?? true
-        self.cmdZoomScrollEnabled = defaults.object(forKey: "cmdZoomScrollEnabled") as? Bool ?? true
-        self.optionFastScrollEnabled = defaults.object(forKey: "optionFastScrollEnabled") as? Bool ?? true
-        self.ctrlSlowScrollEnabled = defaults.object(forKey: "ctrlSlowScrollEnabled") as? Bool ?? true
         self.mousePointerSensitivity = defaults.object(forKey: "mousePointerSensitivity") as? Double ?? 1.0
         
         self.ctrlToCmdRemapEnabled = defaults.object(forKey: "ctrlToCmdRemapEnabled") as? Bool ?? true
