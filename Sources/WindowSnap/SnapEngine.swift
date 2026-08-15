@@ -315,11 +315,25 @@ public final class SnapEngine: @unchecked Sendable {
             )
             let center = CGPoint(x: cocoaWinRect.midX, y: cocoaWinRect.midY)
             
-            if let matchedScreen = NSScreen.screens.first(where: {
-                center.x >= $0.frame.minX && center.x <= $0.frame.maxX &&
-                center.y >= $0.frame.minY && center.y <= $0.frame.maxY
-            }) ?? NSScreen.screens.first(where: { $0.frame.intersects(cocoaWinRect) }) {
-                screen = matchedScreen
+            let screens = NSScreen.screens
+            var matched: NSScreen? = nil
+            for s in screens {
+                let f = s.frame
+                if center.x >= f.minX && center.x <= f.maxX && center.y >= f.minY && center.y <= f.maxY {
+                    matched = s
+                    break
+                }
+            }
+            if matched == nil {
+                for s in screens {
+                    if s.frame.intersects(cocoaWinRect) {
+                        matched = s
+                        break
+                    }
+                }
+            }
+            if let m = matched {
+                screen = m
             }
         }
         
