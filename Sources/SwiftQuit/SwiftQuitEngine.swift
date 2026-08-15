@@ -1,15 +1,17 @@
 import Cocoa
 import ApplicationServices
+import CoreGraphics
 
 @MainActor
 public final class SwiftQuitEngine {
     public static let shared = SwiftQuitEngine()
     
-    private var timer: Timer?
     private var isRunning: Bool = false
+    private var pendingTerminationTasks: [pid_t: DispatchWorkItem] = [:]
     
-    // System apps that should never be auto-terminated
+    // System apps, IDEs, terminals, and games that must NEVER be auto-terminated
     private let systemExcludedBundleIDs: Set<String> = [
+        // System
         "com.apple.finder",
         "com.apple.dock",
         "com.apple.WindowManager",
@@ -19,7 +21,49 @@ public final class SwiftQuitEngine {
         "com.apple.SystemSettings",
         "com.apple.Music",
         "com.apple.mail",
-        "com.winmac.app"
+        "com.apple.Terminal",
+        "com.apple.ActivityMonitor",
+        "com.apple.dt.Xcode",
+        "com.winmac.app",
+        
+        // Developer Tools & IDEs
+        "com.google.antigravity",
+        "com.microsoft.VSCode",
+        "com.microsoft.VSCodeInsiders",
+        "com.cursor.Cursor",
+        "com.sublimetext.4",
+        "com.jetbrains.intellij",
+        "com.jetbrains.pycharm",
+        "com.jetbrains.webstorm",
+        "com.jetbrains.rider",
+        "com.jetbrains.CLion",
+        "com.jetbrains.AppCode",
+        "com.jetbrains.DataGrip",
+        "com.jetbrains.GoLand",
+        "com.jetbrains.RubyMine",
+        "com.jetbrains.fleet",
+        
+        // Terminals
+        "com.googlecode.iterm2",
+        "net.kovidgoyal.kitty",
+        "com.github.wez.wezterm",
+        "dev.warp.Warp-Stable",
+        "io.alacritty",
+        
+        // Games & Launchers
+        "com.riotgames.RiotGames.RiotClient",
+        "com.riotgames.LeagueofLegends.LeagueClientUx",
+        "com.riotgames.LeagueofLegends.GameClient",
+        "com.valvesoftware.steam",
+        "com.epicgames.EpicGamesLauncher",
+        "net.battle.net",
+        "com.ea.mac.eaapp",
+        
+        // Communication
+        "com.tinyspeck.slackmacgap",
+        "com.hnc.Discord",
+        "ru.keepcoder.Telegram",
+        "com.spotify.client"
     ]
     
     private init() {}
@@ -35,20 +79,13 @@ public final class SwiftQuitEngine {
             object: nil
         )
         
-        // Periodic check for apps with 0 windows
-        timer = Timer.scheduledTimer(withTimeInterval: 1.5, repeats: true) { [weak self] _ in
-            Task { @MainActor in
-                self?.checkRunningApplications()
-            }
-        }
-        
-        print("[WinMac] AutoQuitEngine started.")
+        print("[WinMac] AutoQuitEngine started safely.")
     }
     
     public func stop() {
         isRunning = false
-        timer?.invalidate()
-        timer = nil
+        pendingTerminationTasks.values.forEach { $0.cancel() }
+        pendingTerminationTasks.removeAll()
         NSWorkspace.shared.notificationCenter.removeObserver(self)
     }
     
@@ -59,99 +96,130 @@ public final class SwiftQuitEngine {
             return
         }
         
-        checkAndQuitAppIfNeeded(app)
+        checkAndScheduleQuitIfNeeded(app)
     }
     
-    public func checkRunningApplications() {
-        guard AppSettings.shared.swiftQuitEnabled else { return }
-        
-        for app in NSWorkspace.shared.runningApplications {
-            guard app.activationPolicy == .regular,
-                  !app.isTerminated,
-                  app.processIdentifier != ProcessInfo.processInfo.processIdentifier else {
-                continue
-            }
-            
-            checkAndQuitAppIfNeeded(app)
+    private func isExcluded(bundleID: String, localizedName: String) -> Bool {
+        if systemExcludedBundleIDs.contains(bundleID) {
+            return true
         }
-    }
-    
-    private func checkAndQuitAppIfNeeded(_ app: NSRunningApplication) {
-        guard let bundleID = app.bundleIdentifier else { return }
-        guard !systemExcludedBundleIDs.contains(bundleID) else { return }
+        
+        // Check wildcard / prefix exclusions
+        let lowerID = bundleID.lowercased()
+        let lowerName = localizedName.lowercased()
+        
+        if lowerID.contains("riot") || lowerID.contains("league") || lowerID.contains("steam") ||
+           lowerID.contains("epicgames") || lowerID.contains("antigravity") || lowerID.contains("jetbrains") ||
+           lowerID.contains("terminal") || lowerID.contains("xcode") || lowerID.contains("electron") {
+            return true
+        }
+        
+        if lowerName.contains("league") || lowerName.contains("riot") || lowerName.contains("steam") ||
+           lowerName.contains("antigravity") || lowerName.contains("terminal") || lowerName.contains("xcode") {
+            return true
+        }
         
         // User custom exclusions
         let userExclusions = AppSettings.shared.swiftQuitExcludedApps
-        guard !userExclusions.contains(bundleID) else { return }
-        
-        // If app is hidden (Cmd+H), user intends to keep it alive in background
-        if app.isHidden {
-            return
+        if userExclusions.contains(bundleID) {
+            return true
         }
         
-        let appElement = AXUIElementCreateApplication(app.processIdentifier)
-        var windowsVal: AnyObject?
-        let result = AXUIElementCopyAttributeValue(appElement, kAXWindowsAttribute as CFString, &windowsVal)
+        return false
+    }
+    
+    private func hasActiveWindows(pid: pid_t) -> Bool {
+        // 1. CoreGraphics Window List Verification (handles Metal, OpenGL, Games, Electron)
+        if let windowList = CGWindowListCopyWindowInfo([.optionAll], kCGNullWindowID) as? [[String: Any]] {
+            for info in windowList {
+                let winPid = info[kCGWindowOwnerPID as String] as? pid_t ?? 0
+                guard winPid == pid else { continue }
+                
+                let layer = info[kCGWindowLayer as String] as? Int ?? -1
+                let boundsDict = info[kCGWindowBounds as String] as? [String: CGFloat] ?? [:]
+                let width = boundsDict["Width"] ?? 0
+                let height = boundsDict["Height"] ?? 0
+                
+                // Layer 0 is standard app windows. Layer 3 is modal sheets.
+                if (layer == 0 || layer == 3) && width > 60 && height > 60 {
+                    return true
+                }
+            }
+        }
         
-        if result == .success, let windowsList = windowsVal as? [AXUIElement] {
-            // Count genuine windows and check if any window is minimized into Dock
-            var hasMinimizedWindows = false
-            var activeWindowCount = 0
-            
+        // 2. Accessibility API Verification
+        let appElement = AXUIElementCreateApplication(pid)
+        var windowsVal: AnyObject?
+        if AXUIElementCopyAttributeValue(appElement, kAXWindowsAttribute as CFString, &windowsVal) == .success,
+           let windowsList = windowsVal as? [AXUIElement], !windowsList.isEmpty {
             for win in windowsList {
                 var minVal: AnyObject?
                 var sizeVal: AnyObject?
-                
                 AXUIElementCopyAttributeValue(win, kAXMinimizedAttribute as CFString, &minVal)
                 AXUIElementCopyAttributeValue(win, kAXSizeAttribute as CFString, &sizeVal)
                 
                 let isMin = (minVal as? Bool) ?? false
-                if isMin {
-                    hasMinimizedWindows = true
-                }
+                if isMin { return true } // Minimized window in dock counts as alive
                 
                 var size = CGSize.zero
                 if let s = sizeVal {
                     AXValueGetValue(s as! AXValue, .cgSize, &size)
-                }
-                
-                // Real window on screen
-                if size.width > 60 && size.height > 60 {
-                    activeWindowCount += 1
-                }
-            }
-            
-            // If the user minimized a window to Dock, DO NOT terminate the app!
-            if hasMinimizedWindows {
-                return
-            }
-            
-            // Only quit if the app has ZERO open windows (all closed with 'X')
-            if activeWindowCount == 0 && windowsList.isEmpty {
-                let delay = AppSettings.shared.swiftQuitDelaySeconds
-                if delay <= 0 {
-                    terminateApp(app)
-                } else {
-                    DispatchQueue.main.asyncAfter(deadline: .now() + Double(delay)) { [weak self] in
-                        self?.revalidateAndTerminate(app)
+                    if size.width > 60 && size.height > 60 {
+                        return true
                     }
                 }
             }
         }
+        
+        return false
     }
     
-    private func revalidateAndTerminate(_ app: NSRunningApplication) {
-        guard !app.isTerminated, !app.isHidden else { return }
-        let appElement = AXUIElementCreateApplication(app.processIdentifier)
-        var windowsVal: AnyObject?
-        if AXUIElementCopyAttributeValue(appElement, kAXWindowsAttribute as CFString, &windowsVal) == .success,
-           let windowsList = windowsVal as? [AXUIElement], windowsList.isEmpty {
-            terminateApp(app)
+    private func checkAndScheduleQuitIfNeeded(_ app: NSRunningApplication) {
+        guard let bundleID = app.bundleIdentifier else { return }
+        let name = app.localizedName ?? ""
+        
+        // Protection checks
+        guard app.activationPolicy == .regular,
+              !app.isTerminated,
+              app.processIdentifier != ProcessInfo.processInfo.processIdentifier,
+              !app.isHidden,
+              !isExcluded(bundleID: bundleID, localizedName: name) else {
+            return
         }
-    }
-    
-    private func terminateApp(_ app: NSRunningApplication) {
-        print("[WinMac AutoQuit] Closing application with 0 open windows: \(app.localizedName ?? app.bundleIdentifier ?? "")")
-        app.terminate()
+        
+        // If app currently has any active or minimized window, cancel any pending quit task
+        let pid = app.processIdentifier
+        if hasActiveWindows(pid: pid) {
+            pendingTerminationTasks[pid]?.cancel()
+            pendingTerminationTasks.removeValue(forKey: pid)
+            return
+        }
+        
+        // Grace period delay (minimum 2.0s) so dialog transitions don't kill the app
+        let delaySeconds = max(2.0, Double(AppSettings.shared.swiftQuitDelaySeconds))
+        
+        // Cancel existing pending task for this PID if any
+        pendingTerminationTasks[pid]?.cancel()
+        
+        let workItem = DispatchWorkItem { [weak self] in
+            Task { @MainActor in
+                guard let self = self else { return }
+                self.pendingTerminationTasks.removeValue(forKey: pid)
+                
+                // Re-validate before terminating
+                guard !app.isTerminated,
+                      !app.isHidden,
+                      AppSettings.shared.swiftQuitEnabled,
+                      !self.hasActiveWindows(pid: pid) else {
+                    return
+                }
+                
+                print("[WinMac AutoQuit] Gracefully closing app with 0 open windows: \(name) (\(bundleID))")
+                app.terminate()
+            }
+        }
+        
+        pendingTerminationTasks[pid] = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + delaySeconds, execute: workItem)
     }
 }

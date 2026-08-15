@@ -167,11 +167,14 @@ public final class AppSettings: ObservableObject {
     private init() {
         self.showInDock = defaults.object(forKey: "showInDock") as? Bool ?? true
         
-        self.swiftQuitEnabled = defaults.object(forKey: "swiftQuitEnabled") as? Bool ?? true
-        self.swiftQuitDelaySeconds = defaults.object(forKey: "swiftQuitDelaySeconds") as? Int ?? 0
+        self.swiftQuitEnabled = defaults.object(forKey: "swiftQuitEnabled") as? Bool ?? false
+        self.swiftQuitDelaySeconds = defaults.object(forKey: "swiftQuitDelaySeconds") as? Int ?? 2
         self.swiftQuitExcludedApps = defaults.stringArray(forKey: "swiftQuitExcludedApps") ?? [
             "com.apple.Music",
-            "com.apple.mail"
+            "com.apple.mail",
+            "com.google.antigravity",
+            "com.riotgames.RiotGames.RiotClient",
+            "com.riotgames.LeagueofLegends.LeagueClientUx"
         ]
         
         self.altTabEnabled = defaults.object(forKey: "altTabEnabled") as? Bool ?? true
