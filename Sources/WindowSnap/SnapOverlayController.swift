@@ -26,7 +26,7 @@ public final class SnapOverlayController {
         if window.isVisible && window.alphaValue > 0.05 {
             window.orderFrontRegardless()
             NSAnimationContext.runAnimationGroup { context in
-                context.duration = 0.1
+                context.duration = 0.08
                 context.timingFunction = CAMediaTimingFunction(name: .easeOut)
                 window.animator().setFrame(rect, display: true)
                 window.animator().alphaValue = 1.0
@@ -36,7 +36,7 @@ public final class SnapOverlayController {
             window.alphaValue = 0.0
             window.orderFrontRegardless()
             NSAnimationContext.runAnimationGroup { context in
-                context.duration = 0.12
+                context.duration = 0.1
                 context.timingFunction = CAMediaTimingFunction(name: .easeOut)
                 window.animator().alphaValue = 1.0
             }
@@ -48,7 +48,7 @@ public final class SnapOverlayController {
         self.currentRect = .zero
         
         NSAnimationContext.runAnimationGroup { context in
-            context.duration = 0.1
+            context.duration = 0.08
             context.timingFunction = CAMediaTimingFunction(name: .easeOut)
             window.animator().alphaValue = 0.0
         } completionHandler: {
@@ -69,7 +69,7 @@ public final class SnapOverlayController {
         
         w.isOpaque = false
         w.backgroundColor = .clear
-        w.level = NSWindow.Level(Int(CGWindowLevelForKey(.overlayWindow)))
+        w.level = .floating
         w.ignoresMouseEvents = true
         w.collectionBehavior = [.canJoinAllSpaces, .transient, .fullScreenAuxiliary]
         
