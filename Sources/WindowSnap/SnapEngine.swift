@@ -28,21 +28,20 @@ public enum SnapAction: Sendable {
 public final class SnapEngine: @unchecked Sendable {
     public static let shared = SnapEngine()
     
-    // Cycle memory
+    // Rectangle Cycle Memory
     private var lastAction: SnapAction?
     private var lastActionTime: Date = .distantPast
     private var cycleStep: Int = 0
     
-    // Drag-to-snap state
+    // Rectangle Drag-to-Snap State Tracking
     private var currentDragSnapTarget: SnapAction?
-    private var lastDragPoint: CGPoint?
-    private var isDraggingValidWindow: Bool = false
-    private var draggedWindow: AccessibilityElement?
+    private var isDraggingWindow: Bool = false
+    private var trackedWindow: AccessibilityElement?
     private var initialWindowOrigin: CGPoint?
     
     private init() {}
     
-    // MARK: - Game & Excluded Apps Filter
+    // MARK: - Rectangle Frontmost App & Game Filter
     
     private func isFrontmostAppExcluded() -> Bool {
         guard let frontApp = NSWorkspace.shared.frontmostApplication,
@@ -52,7 +51,6 @@ public final class SnapEngine: @unchecked Sendable {
         let lowerID = bundleID.lowercased()
         let lowerName = (frontApp.localizedName ?? "").lowercased()
         
-        // Exclude games, direct fullscreen renderers, and launchers
         if lowerID.contains("riot") || lowerID.contains("league") || lowerID.contains("steam") ||
            lowerID.contains("epicgames") || lowerID.contains("battle.net") || lowerID.contains("ea.app") {
             return true
@@ -63,50 +61,44 @@ public final class SnapEngine: @unchecked Sendable {
         return false
     }
     
-    // MARK: - Drag to Snap Engine (Rectangle Aero Snap)
+    // MARK: - Rectangle 1:1 Drag to Snap Engine
     
     public func handleMouseDown(point: CGPoint) {
         guard !isFrontmostAppExcluded() else {
-            isDraggingValidWindow = false
-            draggedWindow = nil
-            initialWindowOrigin = nil
+            resetDragState()
             return
         }
         
-        lastDragPoint = point
+        guard let frontApp = NSWorkspace.shared.frontmostApplication,
+              frontApp.activationPolicy == .regular,
+              frontApp.processIdentifier != ProcessInfo.processInfo.processIdentifier else {
+            resetDragState()
+            return
+        }
         
-        // Verify if the click is on a real, standard draggable macOS window
-        let mouseLoc = NSEvent.mouseLocation
-        let primaryScreen = NSScreen.screens.first ?? NSScreen.main ?? NSScreen.screens[0]
-        let cgY = primaryScreen.frame.maxY - mouseLoc.y
-        let cgPoint = CGPoint(x: mouseLoc.x, y: cgY)
+        let appElement = AccessibilityElement.application(for: frontApp.processIdentifier)
+        var winElement: AnyObject?
+        let status = AXUIElementCopyAttributeValue(appElement.axElement, kAXFocusedWindowAttribute as CFString, &winElement)
         
-        var elementAtPoint: AXUIElement?
-        if AXUIElementCopyElementAtPosition(AXUIElementCreateSystemWide(), Float(cgPoint.x), Float(cgPoint.y), &elementAtPoint) == .success,
-           let el = elementAtPoint,
-           let winElement = findWindowElement(from: el) {
-            var pid: pid_t = 0
-            if AXUIElementGetPid(winElement, &pid) == .success,
-               let app = NSRunningApplication(processIdentifier: pid),
-               app.processIdentifier != ProcessInfo.processInfo.processIdentifier,
-               app.activationPolicy == .regular {
-                let win = AccessibilityElement(winElement)
-                self.isDraggingValidWindow = true
-                self.draggedWindow = win
-                self.initialWindowOrigin = win.getPosition()
+        if status == .success, let axWin = winElement as! AXUIElement? {
+            let win = AccessibilityElement(axWin)
+            if let pos = win.getPosition() {
+                self.trackedWindow = win
+                self.initialWindowOrigin = pos
+                self.isDraggingWindow = false // Will only become true if position physically changes
                 return
             }
         }
         
-        isDraggingValidWindow = false
-        draggedWindow = nil
-        initialWindowOrigin = nil
+        resetDragState()
     }
     
     public func handleMouseDrag(point: CGPoint) {
-        guard isDraggingValidWindow, !isFrontmostAppExcluded() else {
+        guard !isFrontmostAppExcluded(),
+              let win = trackedWindow,
+              let initialPos = initialWindowOrigin else {
             if currentDragSnapTarget != nil {
-                currentDragSnapTarget = nil
+                resetDragState()
                 SnapOverlayController.shared.hidePreview()
             }
             return
@@ -114,28 +106,33 @@ public final class SnapEngine: @unchecked Sendable {
         
         guard UserDefaults.standard.object(forKey: "dragToSnapEnabled") as? Bool ?? true else {
             if currentDragSnapTarget != nil {
+                resetDragState()
+                SnapOverlayController.shared.hidePreview()
+            }
+            return
+        }
+        
+        // Exact Rectangle check: Has the window's physical position on screen actually changed?
+        guard let currentPos = win.getPosition() else {
+            resetDragState()
+            SnapOverlayController.shared.hidePreview()
+            return
+        }
+        
+        let distanceMoved = hypot(currentPos.x - initialPos.x, currentPos.y - initialPos.y)
+        if distanceMoved < 15.0 {
+            // Window is static (e.g. user clicking inside window, in a game, drawing, clicking buttons)
+            if currentDragSnapTarget != nil {
                 currentDragSnapTarget = nil
                 SnapOverlayController.shared.hidePreview()
             }
             return
         }
         
-        // Verify that the window actually moved from its initial position (not just in-window clicks)
-        if let initialPos = initialWindowOrigin, let curPos = draggedWindow?.getPosition() {
-            let distanceMoved = hypot(curPos.x - initialPos.x, curPos.y - initialPos.y)
-            if distanceMoved < 10.0 {
-                // User hasn't actually dragged the window, probably clicked inside window
-                if currentDragSnapTarget != nil {
-                    currentDragSnapTarget = nil
-                    SnapOverlayController.shared.hidePreview()
-                }
-                return
-            }
-        }
+        // Window is genuinely being dragged by its titlebar across the desktop!
+        self.isDraggingWindow = true
         
-        lastDragPoint = point
         let cursor = NSPoint(x: point.x, y: point.y)
-        
         let screens = NSScreen.screens
         guard let screen = screens.first(where: {
             cursor.x >= $0.frame.minX && cursor.x <= $0.frame.maxX &&
@@ -205,21 +202,30 @@ public final class SnapEngine: @unchecked Sendable {
     
     public func handleMouseUp() {
         let target = currentDragSnapTarget
-        self.currentDragSnapTarget = nil
-        self.isDraggingValidWindow = false
-        self.draggedWindow = nil
-        self.initialWindowOrigin = nil
+        let wasDragging = isDraggingWindow
+        let win = trackedWindow
         
+        resetDragState()
         SnapOverlayController.shared.hidePreview()
         
-        guard let snapTarget = target else { return }
+        guard wasDragging, let snapTarget = target, let targetWin = win else { return }
+        
+        guard let frontApp = NSWorkspace.shared.frontmostApplication else { return }
+        let appElement = AccessibilityElement.application(for: frontApp.processIdentifier)
         
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.02) { [weak self] in
-            self?.snapWindowAtCursorOrFocused(to: snapTarget)
+            self?.applySnap(window: targetWin, app: appElement, action: snapTarget)
         }
     }
     
-    // MARK: - HotKey Dispatcher
+    private func resetDragState() {
+        currentDragSnapTarget = nil
+        isDraggingWindow = false
+        trackedWindow = nil
+        initialWindowOrigin = nil
+    }
+    
+    // MARK: - Rectangle HotKey Dispatcher
     
     public func handleShortcutAction(_ action: SnapAction) {
         guard !isFrontmostAppExcluded() else { return }
@@ -265,56 +271,7 @@ public final class SnapEngine: @unchecked Sendable {
         handleShortcutAction(direction > 0 ? .nextDisplay : .previousDisplay)
     }
     
-    // MARK: - Window Detection & Snapping
-    
-    public func snapWindowAtCursorOrFocused(to action: SnapAction) {
-        guard !isFrontmostAppExcluded() else { return }
-        
-        let mouseLoc = NSEvent.mouseLocation
-        let primaryScreen = NSScreen.screens.first ?? NSScreen.main ?? NSScreen.screens[0]
-        let cgY = primaryScreen.frame.maxY - mouseLoc.y
-        let cgPoint = CGPoint(x: mouseLoc.x, y: cgY)
-        
-        var elementAtPoint: AXUIElement?
-        if AXUIElementCopyElementAtPosition(AXUIElementCreateSystemWide(), Float(cgPoint.x), Float(cgPoint.y), &elementAtPoint) == .success,
-           let el = elementAtPoint {
-            if let winElement = findWindowElement(from: el) {
-                var pid: pid_t = 0
-                if AXUIElementGetPid(winElement, &pid) == .success,
-                   let app = NSRunningApplication(processIdentifier: pid),
-                   app.processIdentifier != ProcessInfo.processInfo.processIdentifier {
-                    let wrappedWindow = AccessibilityElement(winElement)
-                    let wrappedApp = AccessibilityElement.application(for: pid)
-                    applySnap(window: wrappedWindow, app: wrappedApp, action: action)
-                    return
-                }
-            }
-        }
-        
-        snapFocusedWindow(to: action)
-    }
-    
-    private func findWindowElement(from element: AXUIElement) -> AXUIElement? {
-        var current = element
-        for _ in 0..<10 {
-            var roleVal: AnyObject?
-            if AXUIElementCopyAttributeValue(current, kAXRoleAttribute as CFString, &roleVal) == .success,
-               let role = roleVal as? String {
-                if role == (kAXWindowRole as String) {
-                    return current
-                }
-            }
-            
-            var parentVal: AnyObject?
-            if AXUIElementCopyAttributeValue(current, kAXParentAttribute as CFString, &parentVal) == .success,
-               let parent = parentVal {
-                current = parent as! AXUIElement
-            } else {
-                break
-            }
-        }
-        return nil
-    }
+    // MARK: - Window Snapping Execution
     
     public func snapFocusedWindow(to action: SnapAction) {
         guard let frontApp = NSWorkspace.shared.frontmostApplication, !isFrontmostAppExcluded() else { return }
