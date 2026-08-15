@@ -107,7 +107,10 @@ public final class AppSettings: ObservableObject {
         didSet { defaults.set(smoothScrollEnabled, forKey: "smoothScrollEnabled") }
     }
     @Published public var disableMouseAcceleration: Bool {
-        didSet { defaults.set(disableMouseAcceleration, forKey: "disableMouseAcceleration") }
+        didSet {
+            defaults.set(disableMouseAcceleration, forKey: "disableMouseAcceleration")
+            ScrollInverter.shared.updateHardwarePointerProperties(linear: disableMouseAcceleration, sensitivity: mousePointerSensitivity)
+        }
     }
     @Published public var scrollSpeedMultiplier: Double {
         didSet { defaults.set(scrollSpeedMultiplier, forKey: "scrollSpeedMultiplier") }
@@ -125,7 +128,10 @@ public final class AppSettings: ObservableObject {
         didSet { defaults.set(optionFastScrollEnabled, forKey: "optionFastScrollEnabled") }
     }
     @Published public var mousePointerSensitivity: Double {
-        didSet { defaults.set(mousePointerSensitivity, forKey: "mousePointerSensitivity") }
+        didSet {
+            defaults.set(mousePointerSensitivity, forKey: "mousePointerSensitivity")
+            ScrollInverter.shared.updateHardwarePointerProperties(linear: disableMouseAcceleration, sensitivity: mousePointerSensitivity)
+        }
     }
     @Published public var ctrlSlowScrollEnabled: Bool {
         didSet { defaults.set(ctrlSlowScrollEnabled, forKey: "ctrlSlowScrollEnabled") }
@@ -199,7 +205,7 @@ public final class AppSettings: ObservableObject {
         self.itemSize = defaults.object(forKey: "itemSize") as? Double ?? 1.0
         
         self.invertMouseWheel = defaults.object(forKey: "invertMouseWheel") as? Bool ?? true
-        self.invertHorizontalScroll = defaults.object(forKey: "invertHorizontalScroll") as? Bool ?? true
+        self.invertHorizontalScroll = defaults.object(forKey: "invertHorizontalScroll") as? Bool ?? false
         self.smoothScrollEnabled = defaults.object(forKey: "smoothScrollEnabled") as? Bool ?? true
         self.disableMouseAcceleration = defaults.object(forKey: "disableMouseAcceleration") as? Bool ?? false
         self.scrollSpeedMultiplier = defaults.object(forKey: "scrollSpeedMultiplier") as? Double ?? 1.0
@@ -231,5 +237,8 @@ public final class AppSettings: ObservableObject {
         
         self.winLToLockEnabled = defaults.object(forKey: "winLToLockEnabled") as? Bool ?? true
         self.ctrlShiftEscTaskManager = defaults.object(forKey: "ctrlShiftEscTaskManager") as? Bool ?? true
+        
+        // Sync hardware pointer state on startup
+        ScrollInverter.shared.updateHardwarePointerProperties(linear: self.disableMouseAcceleration, sensitivity: self.mousePointerSensitivity)
     }
 }

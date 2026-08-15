@@ -14,20 +14,25 @@ public final class ScrollInverter: @unchecked Sendable {
     private typealias IOHIDEventSystemClientCreateFunc = @convention(c) (CFAllocator?) -> UnsafeMutableRawPointer?
     private typealias IOHIDEventSystemClientSetMatchingFunc = @convention(c) (UnsafeMutableRawPointer, CFDictionary?) -> Void
     private typealias IOHIDEventSystemClientCopyServicesFunc = @convention(c) (UnsafeMutableRawPointer) -> CFArray?
-    private typealias IOHIDServiceClientSetPropertyFunc = @convention(c) (UnsafeMutableRawPointer, CFString, CFTypeRef) -> Bool
+    private typealias IOHIDServiceClientSetPropertyFunc = @convention(c) (UnsafeRawPointer, CFString, CFTypeRef) -> Bool
+    private typealias IOHIDServiceClientCopyPropertyFunc = @convention(c) (UnsafeRawPointer, CFString) -> Unmanaged<CFTypeRef>?
     
     private var iohidHandle: UnsafeMutableRawPointer?
     private var iohidCreate: IOHIDEventSystemClientCreateFunc?
     private var iohidSetMatching: IOHIDEventSystemClientSetMatchingFunc?
     private var iohidCopyServices: IOHIDEventSystemClientCopyServicesFunc?
     private var iohidServiceSetProp: IOHIDServiceClientSetPropertyFunc?
+    private var iohidServiceCopyProp: IOHIDServiceClientCopyPropertyFunc?
     
     private init() {
         setupIOHID()
     }
     
     private func setupIOHID() {
-        guard let handle = dlopen("/System/Library/Frameworks/IOKit.framework/IOKit", RTLD_NOW) else { return }
+        guard let handle = dlopen("/System/Library/Frameworks/IOKit.framework/IOKit", RTLD_NOW) else {
+            print("[WinMac] Warning: Unable to open IOKit framework.")
+            return
+        }
         self.iohidHandle = handle
         
         if let createSym = dlsym(handle, "IOHIDEventSystemClientCreate") {
@@ -42,6 +47,9 @@ public final class ScrollInverter: @unchecked Sendable {
         if let serviceSetPropSym = dlsym(handle, "IOHIDServiceClientSetProperty") {
             self.iohidServiceSetProp = unsafeBitCast(serviceSetPropSym, to: IOHIDServiceClientSetPropertyFunc.self)
         }
+        if let serviceCopyPropSym = dlsym(handle, "IOHIDServiceClientCopyProperty") {
+            self.iohidServiceCopyProp = unsafeBitCast(serviceCopyPropSym, to: IOHIDServiceClientCopyPropertyFunc.self)
+        }
     }
     
     // MARK: - Scroll Wheel Event Processing (LinearMouse Transformer Pipeline)
@@ -55,45 +63,38 @@ public final class ScrollInverter: @unchecked Sendable {
         let cmdZoom = defaults.object(forKey: "cmdZoomScrollEnabled") as? Bool ?? true
         let optFast = defaults.object(forKey: "optionFastScrollEnabled") as? Bool ?? true
         let ctrlSlow = defaults.object(forKey: "ctrlSlowScrollEnabled") as? Bool ?? true
-        let linearAccel = defaults.object(forKey: "disableMouseAcceleration") as? Bool ?? false
-        let sensitivity = defaults.object(forKey: "mousePointerSensitivity") as? Double ?? 1.0
         
-        // 1. Strict Trackpad vs External Mouse Distinction
-        // Trackpad gestures generate continuous scroll events and have non-zero scroll/momentum phases
+        // 1. Strict Trackpad vs External Physical Mouse Distinction
+        // On macOS: Trackpads & Touch gestures ALWAYS have scrollWheelEventIsContinuous != 0 (1).
+        // Physical notched mouse wheels ALWAYS have scrollWheelEventIsContinuous == 0.
         let isContinuous = event.getIntegerValueField(.scrollWheelEventIsContinuous) != 0
-        let scrollPhase = event.getIntegerValueField(.scrollWheelEventScrollPhase)
-        let momentumPhase = event.getIntegerValueField(.scrollWheelEventMomentumPhase)
-        
-        if isContinuous || scrollPhase != 0 || momentumPhase != 0 {
-            // This is a Trackpad or Magic Mouse gesture — NEVER invert, pass through untouched
+        if isContinuous {
+            // Trackpad / Magic Mouse touch gesture — DO NOT MODIFY, return as-is for natural scroll
             return event
         }
         
-        // Sync hardware pointer acceleration and sensitivity in real time
-        updateHardwarePointerProperties(linear: linearAccel, sensitivity: sensitivity)
-        
         let flags = event.flags
-        var deltaY = Double(event.getIntegerValueField(.scrollWheelEventDeltaAxis1))
-        var deltaX = Double(event.getIntegerValueField(.scrollWheelEventDeltaAxis2))
+        var deltaY = event.getIntegerValueField(.scrollWheelEventDeltaAxis1)
+        var deltaX = event.getIntegerValueField(.scrollWheelEventDeltaAxis2)
         
-        var pointDeltaY = Double(event.getIntegerValueField(.scrollWheelEventPointDeltaAxis1))
-        var pointDeltaX = Double(event.getIntegerValueField(.scrollWheelEventPointDeltaAxis2))
+        var pointDeltaY = event.getIntegerValueField(.scrollWheelEventPointDeltaAxis1)
+        var pointDeltaX = event.getIntegerValueField(.scrollWheelEventPointDeltaAxis2)
         
         var fixedDeltaY = event.getDoubleValueField(.scrollWheelEventFixedPtDeltaAxis1)
         var fixedDeltaX = event.getDoubleValueField(.scrollWheelEventFixedPtDeltaAxis2)
         
-        // Ensure non-zero point deltas for notched mouse wheels
+        // Fallback for mice that don't emit point deltas
         if pointDeltaY == 0 && deltaY != 0 {
-            pointDeltaY = deltaY * 12.0
+            pointDeltaY = deltaY * 12
         }
         if pointDeltaX == 0 && deltaX != 0 {
-            pointDeltaX = deltaX * 12.0
+            pointDeltaX = deltaX * 12
         }
         if fixedDeltaY == 0 && deltaY != 0 {
-            fixedDeltaY = deltaY * 12.0
+            fixedDeltaY = Double(deltaY) * 12.0
         }
         if fixedDeltaX == 0 && deltaX != 0 {
-            fixedDeltaX = deltaX * 12.0
+            fixedDeltaX = Double(deltaX) * 12.0
         }
         
         // 2. Cmd + Wheel -> Zoom In / Zoom Out
@@ -111,8 +112,8 @@ public final class ScrollInverter: @unchecked Sendable {
                    let keyUp = CGEvent(keyboardEventSource: source, virtualKey: keyCode, keyDown: false) {
                     keyDown.flags = .maskCommand
                     keyUp.flags = .maskCommand
-                    keyDown.post(tap: .cghidEventTap)
-                    keyUp.post(tap: .cghidEventTap)
+                    keyDown.post(tap: .cgSessionEventTap)
+                    keyUp.post(tap: .cgSessionEventTap)
                 }
             }
             return nil
@@ -144,12 +145,12 @@ public final class ScrollInverter: @unchecked Sendable {
         
         // 7. Apply Speed Multiplier
         if speedMult != 1.0 && speedMult > 0 {
-            deltaY *= speedMult
-            pointDeltaY *= speedMult
-            fixedDeltaY *= speedMult
-            deltaX *= speedMult
-            pointDeltaX *= speedMult
-            fixedDeltaX *= speedMult
+            deltaY = Int64(Double(deltaY) * speedMult)
+            pointDeltaY = Int64(Double(pointDeltaY) * speedMult)
+            fixedDeltaY = fixedDeltaY * speedMult
+            deltaX = Int64(Double(deltaX) * speedMult)
+            pointDeltaX = Int64(Double(pointDeltaX) * speedMult)
+            fixedDeltaX = fixedDeltaX * speedMult
         }
         
         // 8. Shift + Wheel -> Horizontal Scroll
@@ -158,31 +159,30 @@ public final class ScrollInverter: @unchecked Sendable {
             event.setIntegerValueField(.scrollWheelEventPointDeltaAxis1, value: 0)
             event.setDoubleValueField(.scrollWheelEventFixedPtDeltaAxis1, value: 0.0)
             
-            event.setIntegerValueField(.scrollWheelEventDeltaAxis2, value: Int64(deltaY))
-            event.setIntegerValueField(.scrollWheelEventPointDeltaAxis2, value: Int64(pointDeltaY))
+            event.setIntegerValueField(.scrollWheelEventDeltaAxis2, value: deltaY)
+            event.setIntegerValueField(.scrollWheelEventPointDeltaAxis2, value: pointDeltaY)
             event.setDoubleValueField(.scrollWheelEventFixedPtDeltaAxis2, value: fixedDeltaY)
             return event
         }
         
-        // Write transformed values directly back into the CGEvent
-        event.setIntegerValueField(.scrollWheelEventDeltaAxis1, value: Int64(deltaY))
-        event.setIntegerValueField(.scrollWheelEventPointDeltaAxis1, value: Int64(pointDeltaY))
+        // Write transformed values back into the CGEvent
+        event.setIntegerValueField(.scrollWheelEventDeltaAxis1, value: deltaY)
+        event.setIntegerValueField(.scrollWheelEventPointDeltaAxis1, value: pointDeltaY)
         event.setDoubleValueField(.scrollWheelEventFixedPtDeltaAxis1, value: fixedDeltaY)
         
-        event.setIntegerValueField(.scrollWheelEventDeltaAxis2, value: Int64(deltaX))
-        event.setIntegerValueField(.scrollWheelEventPointDeltaAxis2, value: Int64(pointDeltaX))
+        event.setIntegerValueField(.scrollWheelEventDeltaAxis2, value: deltaX)
+        event.setIntegerValueField(.scrollWheelEventPointDeltaAxis2, value: pointDeltaX)
         event.setDoubleValueField(.scrollWheelEventFixedPtDeltaAxis2, value: fixedDeltaX)
         
         return event
     }
     
-    // MARK: - Hardware Pointer Acceleration & Sensitivity (Linear Curve / Windows Style)
+    // MARK: - Hardware Pointer Acceleration & Sensitivity (Linear 1:1 Response / Windows Style)
     public func updateHardwarePointerProperties(linear: Bool, sensitivity: Double) {
-        guard lastLinearAccel != linear || lastPointerSensitivity != sensitivity else { return }
         lastLinearAccel = linear
         lastPointerSensitivity = sensitivity
         
-        // Apply hardware acceleration property to HID mouse services
+        // 1. Apply hardware acceleration property via IOHIDEventSystemClient & IOHIDServiceClient
         if let createFn = self.iohidCreate,
            let copyServicesFn = self.iohidCopyServices,
            let serviceSetPropFn = self.iohidServiceSetProp,
@@ -196,22 +196,25 @@ public final class ScrollInverter: @unchecked Sendable {
                 setMatchingFn(client, matching as CFDictionary)
             }
             
-            if let services = copyServicesFn(client) as? [UnsafeMutableRawPointer] {
-                for service in services {
-                    if linear {
-                        // -1.0 CFNumber completely disables macOS non-linear acceleration curve
-                        let accelVal = -1.0 as CFNumber
-                        _ = serviceSetPropFn(service, "HIDMouseAcceleration" as CFString, accelVal)
-                        _ = serviceSetPropFn(service, "HIDPointerAcceleration" as CFString, accelVal)
-                    } else {
-                        let accelVal = (sensitivity * 0.8) as CFNumber
-                        _ = serviceSetPropFn(service, "HIDMouseAcceleration" as CFString, accelVal)
+            if let services = copyServicesFn(client) {
+                let count = CFArrayGetCount(services)
+                for i in 0..<count {
+                    if let service = CFArrayGetValueAtIndex(services, i) {
+                        if linear {
+                            // -1.0 CFNumber completely disables macOS non-linear acceleration curve
+                            let accelVal = -1.0 as CFNumber
+                            _ = serviceSetPropFn(service, "HIDMouseAcceleration" as CFString, accelVal)
+                            _ = serviceSetPropFn(service, "HIDPointerAcceleration" as CFString, accelVal)
+                        } else {
+                            let accelVal = (sensitivity * 65536.0) as CFNumber
+                            _ = serviceSetPropFn(service, "HIDMouseAcceleration" as CFString, accelVal)
+                        }
                     }
                 }
             }
         }
         
-        // Global Preference Synchronization for macOS Pointer Scaling
+        // 2. Global Preference Synchronization for macOS Pointer Scaling
         DispatchQueue.global(qos: .utility).async {
             let task = Process()
             task.launchPath = "/usr/bin/defaults"
