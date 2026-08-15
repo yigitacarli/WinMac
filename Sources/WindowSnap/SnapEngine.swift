@@ -133,7 +133,6 @@ public final class SnapEngine: @unchecked Sendable {
         self.currentDragSnapTarget = nil
         SnapOverlayController.shared.hidePreview()
         
-        // Execute snap with a micro-delay to let the drag finish releasing
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.02) { [weak self] in
             self?.snapWindowAtCursorOrFocused(to: target)
         }
@@ -149,18 +148,23 @@ public final class SnapEngine: @unchecked Sendable {
         
         var effectiveAction = action
         
-        if cycleEnabled && isRecent {
+        if cycleEnabled && isRecent && lastAction == action {
+            cycleStep = (cycleStep + 1) % 3
             switch action {
-            case .leftHalf, .leftTwoThirds, .leftThird:
-                cycleStep = (cycleStep + 1) % 3
-                effectiveAction = cycleStep == 0 ? .leftHalf : (cycleStep == 1 ? .leftTwoThirds : .leftThird)
-            case .rightHalf, .rightTwoThirds, .rightThird:
-                cycleStep = (cycleStep + 1) % 3
-                effectiveAction = cycleStep == 0 ? .rightHalf : (cycleStep == 1 ? .rightTwoThirds : .rightThird)
-            case .topHalf, .maximize:
-                effectiveAction = lastAction == .topHalf ? .maximize : .topHalf
-            case .bottomHalf, .center:
-                effectiveAction = lastAction == .bottomHalf ? .center : .bottomHalf
+            case .leftHalf:
+                if cycleStep == 1 { effectiveAction = .leftTwoThirds }
+                else if cycleStep == 2 { effectiveAction = .leftThird }
+                else { effectiveAction = .leftHalf }
+            case .rightHalf:
+                if cycleStep == 1 { effectiveAction = .rightTwoThirds }
+                else if cycleStep == 2 { effectiveAction = .rightThird }
+                else { effectiveAction = .rightHalf }
+            case .topHalf:
+                if cycleStep == 1 { effectiveAction = .maximize }
+                else { effectiveAction = .topHalf }
+            case .bottomHalf:
+                if cycleStep == 1 { effectiveAction = .bottomHalf }
+                else { effectiveAction = .bottomHalf }
             default:
                 break
             }
@@ -168,40 +172,40 @@ public final class SnapEngine: @unchecked Sendable {
             cycleStep = 0
         }
         
-        self.lastAction = effectiveAction
-        self.lastActionTime = now
+        lastAction = action
+        lastActionTime = now
         
         snapFocusedWindow(to: effectiveAction)
     }
     
-    // MARK: - Window Manipulation Engine (Rectangle Architecture)
+    public func moveFocusedWindowToDisplay(direction: Int) {
+        handleShortcutAction(direction > 0 ? .nextDisplay : .previousDisplay)
+    }
+    
+    // MARK: - Window Detection & Snapping
     
     public func snapWindowAtCursorOrFocused(to action: SnapAction) {
+        let mouseLoc = NSEvent.mouseLocation
         let primaryScreen = NSScreen.screens.first ?? NSScreen.main ?? NSScreen.screens[0]
-        let primaryMaxY = primaryScreen.frame.maxY
-        let cursorLoc = NSEvent.mouseLocation
+        let cgY = primaryScreen.frame.maxY - mouseLoc.y
+        let cgPoint = CGPoint(x: mouseLoc.x, y: cgY)
         
-        // 1. Try finding window under cursor via System-Wide Accessibility
-        let sysElement = AXUIElementCreateSystemWide()
-        var hitElement: AXUIElement?
-        let axPointX = Float(cursorLoc.x)
-        let axPointY = Float(primaryMaxY - cursorLoc.y)
-        
-        if AXUIElementCopyElementAtPosition(sysElement, axPointX, axPointY, &hitElement) == .success,
-           let hit = hitElement {
-            if let targetWindow = findWindowElement(from: hit) {
+        var elementAtPoint: AXUIElement?
+        if AXUIElementCopyElementAtPosition(AXUIElementCreateSystemWide(), Float(cgPoint.x), Float(cgPoint.y), &elementAtPoint) == .success,
+           let el = elementAtPoint {
+            if let winElement = findWindowElement(from: el) {
                 var pid: pid_t = 0
-                if AXUIElementGetPid(targetWindow, &pid) == .success {
-                    let appElement = AXUIElementCreateApplication(pid)
-                    if let app = NSRunningApplication(processIdentifier: pid) {
-                        applySnap(windowElement: targetWindow, appElement: appElement, frontApp: app, action: action)
-                        return
-                    }
+                if AXUIElementGetPid(winElement, &pid) == .success,
+                   let app = NSRunningApplication(processIdentifier: pid),
+                   app.processIdentifier != ProcessInfo.processInfo.processIdentifier {
+                    let wrappedWindow = AccessibilityElement(winElement)
+                    let wrappedApp = AccessibilityElement.application(for: pid)
+                    applySnap(window: wrappedWindow, app: wrappedApp, action: action)
+                    return
                 }
             }
         }
         
-        // 2. Fallback to focused window
         snapFocusedWindow(to: action)
     }
     
@@ -228,116 +232,39 @@ public final class SnapEngine: @unchecked Sendable {
     }
     
     public func snapFocusedWindow(to action: SnapAction) {
-        let ownPid = ProcessInfo.processInfo.processIdentifier
         guard let frontApp = NSWorkspace.shared.frontmostApplication else { return }
         
-        // If WinMac itself is frontmost, snap WinMac's own window directly
-        if frontApp.processIdentifier == ownPid {
-            if let keyWin = NSApp.keyWindow ?? NSApp.mainWindow {
-                let screen = keyWin.screen ?? NSScreen.main ?? NSScreen.screens[0]
-                let visibleFrame = screen.visibleFrame
-                let targetRect = calculateTargetRect(for: action, visibleFrame: visibleFrame)
-                keyWin.setFrame(targetRect, display: true, animate: true)
-                return
-            }
-        }
-        
-        let appElement = AXUIElementCreateApplication(frontApp.processIdentifier)
+        let appElement = AccessibilityElement.application(for: frontApp.processIdentifier)
         
         var focusedWindowVal: AnyObject?
-        let axStatus = AXUIElementCopyAttributeValue(appElement, kAXFocusedWindowAttribute as CFString, &focusedWindowVal)
+        let axStatus = AXUIElementCopyAttributeValue(appElement.axElement, kAXFocusedWindowAttribute as CFString, &focusedWindowVal)
         
         if axStatus == .success, let windowElement = focusedWindowVal as! AXUIElement? {
-            applySnap(windowElement: windowElement, appElement: appElement, frontApp: frontApp, action: action)
+            applySnap(window: AccessibilityElement(windowElement), app: appElement, action: action)
             return
         }
         
-        // Fallback: try kAXMainWindowAttribute
         var mainWinVal: AnyObject?
-        if AXUIElementCopyAttributeValue(appElement, kAXMainWindowAttribute as CFString, &mainWinVal) == .success,
+        if AXUIElementCopyAttributeValue(appElement.axElement, kAXMainWindowAttribute as CFString, &mainWinVal) == .success,
            let mainWin = mainWinVal as! AXUIElement? {
-            applySnap(windowElement: mainWin, appElement: appElement, frontApp: frontApp, action: action)
+            applySnap(window: AccessibilityElement(mainWin), app: appElement, action: action)
             return
         }
         
-        // Fallback: try first window of front app
         var windowsVal: AnyObject?
-        if AXUIElementCopyAttributeValue(appElement, kAXWindowsAttribute as CFString, &windowsVal) == .success,
+        if AXUIElementCopyAttributeValue(appElement.axElement, kAXWindowsAttribute as CFString, &windowsVal) == .success,
            let windowsList = windowsVal as? [AXUIElement], let firstWin = windowsList.first {
-            applySnap(windowElement: firstWin, appElement: appElement, frontApp: frontApp, action: action)
+            applySnap(window: AccessibilityElement(firstWin), app: appElement, action: action)
         }
     }
     
-    private func calculateTargetRect(for action: SnapAction, visibleFrame: CGRect) -> CGRect {
-        let gaps = CGFloat(UserDefaults.standard.double(forKey: "snapWindowGaps"))
-        let adjustedFrame = visibleFrame.insetBy(dx: gaps, dy: gaps)
-        
-        let halfWidth = (adjustedFrame.width - gaps) / 2.0
-        let halfHeight = (adjustedFrame.height - gaps) / 2.0
-        let thirdWidth = (adjustedFrame.width - (gaps * 2.0)) / 3.0
-        let twoThirdsWidth = (adjustedFrame.width * 2.0) / 3.0
-        
-        switch action {
-        case .leftHalf:
-            return CGRect(x: adjustedFrame.minX, y: adjustedFrame.minY, width: halfWidth, height: adjustedFrame.height)
-        case .rightHalf:
-            return CGRect(x: adjustedFrame.minX + halfWidth + gaps, y: adjustedFrame.minY, width: halfWidth, height: adjustedFrame.height)
-        case .topHalf:
-            return CGRect(x: adjustedFrame.minX, y: adjustedFrame.minY + halfHeight + gaps, width: adjustedFrame.width, height: halfHeight)
-        case .bottomHalf:
-            return CGRect(x: adjustedFrame.minX, y: adjustedFrame.minY, width: adjustedFrame.width, height: halfHeight)
-        case .maximize:
-            return adjustedFrame
-        case .topLeftQuarter:
-            return CGRect(x: adjustedFrame.minX, y: adjustedFrame.minY + halfHeight + gaps, width: halfWidth, height: halfHeight)
-        case .topRightQuarter:
-            return CGRect(x: adjustedFrame.minX + halfWidth + gaps, y: adjustedFrame.minY + halfHeight + gaps, width: halfWidth, height: halfHeight)
-        case .bottomLeftQuarter:
-            return CGRect(x: adjustedFrame.minX, y: adjustedFrame.minY, width: halfWidth, height: halfHeight)
-        case .bottomRightQuarter:
-            return CGRect(x: adjustedFrame.minX + halfWidth + gaps, y: adjustedFrame.minY, width: halfWidth, height: halfHeight)
-            
-        case .leftThird:
-            return CGRect(x: adjustedFrame.minX, y: adjustedFrame.minY, width: thirdWidth, height: adjustedFrame.height)
-        case .centerThird:
-            return CGRect(x: adjustedFrame.minX + thirdWidth + gaps, y: adjustedFrame.minY, width: thirdWidth, height: adjustedFrame.height)
-        case .rightThird:
-            return CGRect(x: adjustedFrame.minX + (thirdWidth * 2.0) + (gaps * 2.0), y: adjustedFrame.minY, width: thirdWidth, height: adjustedFrame.height)
-        case .leftTwoThirds:
-            return CGRect(x: adjustedFrame.minX, y: adjustedFrame.minY, width: twoThirdsWidth, height: adjustedFrame.height)
-        case .rightTwoThirds:
-            return CGRect(x: adjustedFrame.minX + (adjustedFrame.width - twoThirdsWidth), y: adjustedFrame.minY, width: twoThirdsWidth, height: adjustedFrame.height)
-            
-        case .center:
-            let w = adjustedFrame.width * 0.72
-            let h = adjustedFrame.height * 0.72
-            return CGRect(
-                x: adjustedFrame.minX + (adjustedFrame.width - w) / 2.0,
-                y: adjustedFrame.minY + (adjustedFrame.height - h) / 2.0,
-                width: w,
-                height: h
-            )
-        case .nextDisplay, .previousDisplay, .expandSize, .shrinkSize:
-            return adjustedFrame
-        }
-    }
-    
-    private func applySnap(windowElement: AXUIElement, appElement: AXUIElement, frontApp: NSRunningApplication, action: SnapAction) {
+    private func applySnap(window: AccessibilityElement, app: AccessibilityElement, action: SnapAction) {
         let primaryScreen = NSScreen.screens.first ?? NSScreen.main ?? NSScreen.screens[0]
         let primaryMaxY = primaryScreen.frame.maxY
         
         var screen: NSScreen = primaryScreen
         
-        var posVal: AnyObject?
-        var sizeVal: AnyObject?
-        if AXUIElementCopyAttributeValue(windowElement, kAXPositionAttribute as CFString, &posVal) == .success,
-           AXUIElementCopyAttributeValue(windowElement, kAXSizeAttribute as CFString, &sizeVal) == .success,
-           let pVal = posVal, let sVal = sizeVal {
-            var pt = CGPoint.zero
-            var sz = CGSize.zero
-            AXValueGetValue(pVal as! AXValue, .cgPoint, &pt)
-            AXValueGetValue(sVal as! AXValue, .cgSize, &sz)
-            
+        if let pt = window.getPosition(), let sz = window.getSize() {
             let cocoaWinRect = CGRect(
                 x: pt.x,
                 y: primaryMaxY - (pt.y + sz.height),
@@ -355,117 +282,26 @@ public final class SnapEngine: @unchecked Sendable {
         }
         
         let visibleFrame = screen.visibleFrame
+        let gaps = CGFloat(UserDefaults.standard.double(forKey: "snapWindowGaps"))
         
-        // Handle expand / shrink
-        if action == .expandSize || action == .shrinkSize {
-            var sizeVal2: AnyObject?
-            var posVal2: AnyObject?
-            if AXUIElementCopyAttributeValue(windowElement, kAXSizeAttribute as CFString, &sizeVal2) == .success,
-               AXUIElementCopyAttributeValue(windowElement, kAXPositionAttribute as CFString, &posVal2) == .success,
-               let sVal2 = sizeVal2, let pVal2 = posVal2 {
-                var currentSize = CGSize.zero
-                var currentPos = CGPoint.zero
-                AXValueGetValue(sVal2 as! AXValue, .cgSize, &currentSize)
-                AXValueGetValue(pVal2 as! AXValue, .cgPoint, &currentPos)
-                
-                let scale: CGFloat = (action == .expandSize) ? 1.1 : 0.9
-                let newW = min(visibleFrame.width, currentSize.width * scale)
-                let newH = min(visibleFrame.height, currentSize.height * scale)
-                let deltaW = newW - currentSize.width
-                let deltaH = newH - currentSize.height
-                
-                let newSize = CGSize(width: newW, height: newH)
-                let newOrigin = CGPoint(x: currentPos.x - (deltaW / 2.0), y: currentPos.y - (deltaH / 2.0))
-                
-                setFrame(windowElement: windowElement, appElement: appElement, position: newOrigin, size: newSize)
+        // Multi-display navigation
+        if action == .nextDisplay || action == .previousDisplay {
+            let allScreens = NSScreen.screens
+            if allScreens.count > 1, let curIdx = allScreens.firstIndex(of: screen) {
+                let nextIdx = (action == .nextDisplay) ? (curIdx + 1) % allScreens.count : (curIdx - 1 + allScreens.count) % allScreens.count
+                let targetScreen = allScreens[nextIdx]
+                let targetRect = WindowCalculation.calculateRect(for: .maximize, visibleFrame: targetScreen.visibleFrame, gaps: gaps)
+                let axY = primaryMaxY - targetRect.maxY
+                window.setFrame(position: CGPoint(x: targetRect.minX, y: axY), size: CGSize(width: targetRect.width, height: targetRect.height), appElement: app)
+                return
             }
-            return
         }
         
-        let targetRect = calculateTargetRect(for: action, visibleFrame: visibleFrame)
+        let targetRect = WindowCalculation.calculateRect(for: action, visibleFrame: visibleFrame, gaps: gaps)
         let axY = primaryMaxY - targetRect.maxY
         let origin = CGPoint(x: targetRect.minX, y: axY)
         let size = CGSize(width: targetRect.width, height: targetRect.height)
         
-        setFrame(windowElement: windowElement, appElement: appElement, position: origin, size: size)
-    }
-    
-    private func setFrame(windowElement: AXUIElement, appElement: AXUIElement, position: CGPoint, size: CGSize) {
-        // Rectangle technique: disable AXEnhancedUserInterface temporarily to allow Chromium/Electron apps to resize
-        var enhancedUIRef: AnyObject?
-        let hasEnhancedUI = AXUIElementCopyAttributeValue(appElement, "AXEnhancedUserInterface" as CFString, &enhancedUIRef) == .success
-        if hasEnhancedUI {
-            AXUIElementSetAttributeValue(appElement, "AXEnhancedUserInterface" as CFString, kCFBooleanFalse)
-        }
-        
-        var s = size
-        var p = position
-        
-        // Rectangle 3-step order: Position -> Size -> Position (Chromium / Electron / macOS compatibility)
-        if let posVal = AXValueCreate(.cgPoint, &p) {
-            AXUIElementSetAttributeValue(windowElement, kAXPositionAttribute as CFString, posVal)
-        }
-        if let sizeVal = AXValueCreate(.cgSize, &s) {
-            AXUIElementSetAttributeValue(windowElement, kAXSizeAttribute as CFString, sizeVal)
-        }
-        if let posVal = AXValueCreate(.cgPoint, &p) {
-            AXUIElementSetAttributeValue(windowElement, kAXPositionAttribute as CFString, posVal)
-        }
-        
-        if hasEnhancedUI {
-            AXUIElementSetAttributeValue(appElement, "AXEnhancedUserInterface" as CFString, kCFBooleanTrue)
-        }
-    }
-    
-    public func moveFocusedWindowToDisplay(direction: Int) {
-        guard let frontApp = NSWorkspace.shared.frontmostApplication else { return }
-        let screens = NSScreen.screens
-        guard screens.count > 1 else { return }
-        
-        let primaryScreen = screens.first ?? NSScreen.main ?? screens[0]
-        let primaryMaxY = primaryScreen.frame.maxY
-        
-        let appElement = AXUIElementCreateApplication(frontApp.processIdentifier)
-        var focusedWindowVal: AnyObject?
-        guard AXUIElementCopyAttributeValue(appElement, kAXFocusedWindowAttribute as CFString, &focusedWindowVal) == .success,
-              let windowElement = focusedWindowVal as! AXUIElement? else {
-            return
-        }
-        
-        var currentScreen = primaryScreen
-        var posVal: AnyObject?
-        var sizeVal: AnyObject?
-        if AXUIElementCopyAttributeValue(windowElement, kAXPositionAttribute as CFString, &posVal) == .success,
-           AXUIElementCopyAttributeValue(windowElement, kAXSizeAttribute as CFString, &sizeVal) == .success,
-           let pVal = posVal, let sVal = sizeVal {
-            var pt = CGPoint.zero
-            var sz = CGSize.zero
-            AXValueGetValue(pVal as! AXValue, .cgPoint, &pt)
-            AXValueGetValue(sVal as! AXValue, .cgSize, &sz)
-            
-            let cocoaWinRect = CGRect(
-                x: pt.x,
-                y: primaryMaxY - (pt.y + sz.height),
-                width: sz.width,
-                height: sz.height
-            )
-            let center = CGPoint(x: cocoaWinRect.midX, y: cocoaWinRect.midY)
-            if let matched = screens.first(where: {
-                center.x >= $0.frame.minX && center.x <= $0.frame.maxX &&
-                center.y >= $0.frame.minY && center.y <= $0.frame.maxY
-            }) {
-                currentScreen = matched
-            }
-        }
-        
-        guard let currentIndex = screens.firstIndex(of: currentScreen) else { return }
-        let nextIndex = (currentIndex + direction + screens.count) % screens.count
-        let targetScreen = screens[nextIndex]
-        
-        let targetFrame = targetScreen.visibleFrame
-        let origin = CGPoint(x: targetFrame.minX + 40, y: primaryMaxY - targetFrame.maxY + 40)
-        let size = CGSize(width: targetFrame.width * 0.7, height: targetFrame.height * 0.7)
-        
-        setFrame(windowElement: windowElement, appElement: appElement, position: origin, size: size)
+        window.setFrame(position: origin, size: size, appElement: app)
     }
 }

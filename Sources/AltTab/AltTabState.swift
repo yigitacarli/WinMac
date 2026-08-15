@@ -102,6 +102,22 @@ public final class AltTabState: ObservableObject {
         WindowEngine.shared.minimizeWindow(target)
     }
     
+    public func showSwitcher() {
+        AltTabHUDController.shared.show()
+    }
+    
+    public func cancelSelection() {
+        dismiss()
+    }
+    
+    public func closeSelectedWindow() {
+        closeCurrentWindow()
+    }
+    
+    public func quitSelectedApp() {
+        quitCurrentApp()
+    }
+    
     public func maximizeCurrentWindow() {
         guard let target = selectedWindow else { return }
         WindowEngine.shared.maximizeWindow(target)

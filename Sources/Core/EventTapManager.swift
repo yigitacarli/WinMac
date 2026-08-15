@@ -8,8 +8,6 @@ public final class EventTapManager: @unchecked Sendable {
     
     private var globalEventTap: CFMachPort?
     private var eventRunLoopSource: CFRunLoopSource?
-    private var mouseDragMonitor: Any?
-    private var mouseUpMonitor: Any?
     
     // Alt + Tab State Tracking
     private var isAltTabActive = false
@@ -26,14 +24,13 @@ public final class EventTapManager: @unchecked Sendable {
         // HotKeys run independently of Accessibility
         DispatchQueue.main.async {
             HotKeyManager.shared.start()
-            self.startGlobalMouseMonitors()
         }
         
         // CGEventTap requires Accessibility permissions
         if AXIsProcessTrusted() {
             startUnifiedEventTap()
         } else {
-            print("[WinMac] Accessibility permission not yet granted. HotKeys and monitors started, CGEventTap deferred.")
+            print("[WinMac] Accessibility permission not yet granted. HotKeys started, CGEventTap deferred.")
         }
     }
     
@@ -44,7 +41,6 @@ public final class EventTapManager: @unchecked Sendable {
     
     public func stop() {
         stopUnifiedEventTap()
-        stopGlobalMouseMonitors()
         print("[WinMac] All services stopped safely.")
     }
     
@@ -113,35 +109,6 @@ public final class EventTapManager: @unchecked Sendable {
         }
     }
     
-    // MARK: - Global Mouse Monitors (Supplementary backup)
-    private func startGlobalMouseMonitors() {
-        stopGlobalMouseMonitors()
-        
-        mouseDragMonitor = NSEvent.addGlobalMonitorForEvents(matching: .leftMouseDragged) { _ in
-            let loc = NSEvent.mouseLocation
-            DispatchQueue.main.async {
-                SnapEngine.shared.handleMouseDrag(point: CGPoint(x: loc.x, y: loc.y))
-            }
-        }
-        
-        mouseUpMonitor = NSEvent.addGlobalMonitorForEvents(matching: .leftMouseUp) { _ in
-            DispatchQueue.main.async {
-                SnapEngine.shared.handleMouseUp()
-            }
-        }
-    }
-    
-    private func stopGlobalMouseMonitors() {
-        if let monitor = mouseDragMonitor {
-            NSEvent.removeMonitor(monitor)
-            mouseDragMonitor = nil
-        }
-        if let monitor = mouseUpMonitor {
-            NSEvent.removeMonitor(monitor)
-            mouseUpMonitor = nil
-        }
-    }
-    
     // MARK: - Event Handler
     private func handleSystemEvent(proxy: CGEventTapProxy, type: CGEventType, event: CGEvent) -> Unmanaged<CGEvent>? {
         // Re-enable tap if disabled by system timeout
@@ -152,7 +119,7 @@ public final class EventTapManager: @unchecked Sendable {
             return Unmanaged.passUnretained(event)
         }
         
-        // 1. Mouse Drag & Snap Handling
+        // 1. Mouse Drag & Snap Handling (Single source of truth)
         if type == .leftMouseDown {
             let loc = NSEvent.mouseLocation
             DispatchQueue.main.async {
@@ -176,7 +143,7 @@ public final class EventTapManager: @unchecked Sendable {
             return Unmanaged.passUnretained(event)
         }
         
-        // 2. Mouse Scroll Inversion & Modifiers (LinearMouse Engine)
+        // 2. Mouse Scroll Inversion (LinearMouse Engine)
         if type == .scrollWheel {
             if let modified = ScrollInverter.shared.handleScrollEvent(event: event) {
                 return Unmanaged.passUnretained(modified)
@@ -220,64 +187,100 @@ public final class EventTapManager: @unchecked Sendable {
             
             if isCtrlTabPref {
                 // Control + Tab
-                isTriggerMatch = (keyCode == 48 && flags.contains(.maskControl) && !flags.contains(.maskAlternate) && !flags.contains(.maskCommand))
+                isTriggerMatch = keyCode == 48 && flags.contains(.maskControl)
                 currentModifier = .control
             } else {
-                // Option + Tab (Alt + Tab)
-                isTriggerMatch = (keyCode == 48 && flags.contains(.maskAlternate) && !flags.contains(.maskControl) && !flags.contains(.maskCommand))
+                // Option + Tab
+                isTriggerMatch = keyCode == 48 && flags.contains(.maskAlternate)
                 currentModifier = .option
             }
             
             if isTriggerMatch {
+                let isBackwards = flags.contains(.maskShift)
+                activeTriggerModifier = currentModifier
+                
                 if !isAltTabActive {
                     isAltTabActive = true
-                    activeTriggerModifier = currentModifier
                     DispatchQueue.main.async {
-                        AltTabHUDController.shared.show()
+                        AltTabState.shared.showSwitcher()
+                        if isBackwards {
+                            AltTabState.shared.selectPrevious()
+                        } else {
+                            AltTabState.shared.selectNext()
+                        }
                     }
                 } else {
                     DispatchQueue.main.async {
-                        if flags.contains(.maskShift) {
+                        if isBackwards {
                             AltTabState.shared.selectPrevious()
                         } else {
                             AltTabState.shared.selectNext()
                         }
                     }
                 }
-                return nil
+                return nil // Suppress raw event so system doesn't beep
             }
-        }
-        
-        // 5. Option + V / Control + Shift + V / Command + Shift + V -> Clipboard History
-        let clipEnabled = defaults.object(forKey: "clipboardHistoryEnabled") as? Bool ?? true
-        if type == .keyDown && clipEnabled {
-            let isOptV = (keyCode == 9 && flags.contains(.maskAlternate) && !flags.contains(.maskControl) && !flags.contains(.maskCommand))
-            let isCtrlShiftV = (keyCode == 9 && flags.contains(.maskControl) && flags.contains(.maskShift) && !flags.contains(.maskCommand))
-            let isCmdShiftV = (keyCode == 9 && flags.contains(.maskCommand) && flags.contains(.maskShift) && !flags.contains(.maskControl))
             
-            if isOptV || isCtrlShiftV || isCmdShiftV {
-                DispatchQueue.main.async {
-                    ClipboardHUDController.shared.toggle()
+            // 5. In-Switcher Navigation Keys
+            if isAltTabActive {
+                // Escape key (KeyCode 53) -> Cancel
+                if keyCode == 53 {
+                    isAltTabActive = false
+                    DispatchQueue.main.async {
+                        AltTabState.shared.cancelSelection()
+                    }
+                    return nil
                 }
-                return nil
+                // Left arrow (KeyCode 123)
+                if keyCode == 123 {
+                    DispatchQueue.main.async { AltTabState.shared.selectPrevious() }
+                    return nil
+                }
+                // Right arrow (KeyCode 124)
+                if keyCode == 124 {
+                    DispatchQueue.main.async { AltTabState.shared.selectNext() }
+                    return nil
+                }
+                // Return / Enter (KeyCode 36) -> Confirm
+                if keyCode == 36 {
+                    isAltTabActive = false
+                    DispatchQueue.main.async { AltTabState.shared.confirmSelection() }
+                    return nil
+                }
+                // 'W' key (KeyCode 13) -> Close focused window
+                if keyCode == 13 {
+                    DispatchQueue.main.async { AltTabState.shared.closeSelectedWindow() }
+                    return nil
+                }
+                // 'Q' key (KeyCode 12) -> Quit focused app
+                if keyCode == 12 {
+                    DispatchQueue.main.async { AltTabState.shared.quitSelectedApp() }
+                    return nil
+                }
             }
         }
         
-        // 6. System Shortcuts (Option + L -> Lock Screen, etc.)
-        if let sysResult = SystemShortcuts.shared.handleKeyEvent(type: type, event: event) {
-            if sysResult !== event {
-                return Unmanaged.passRetained(sysResult)
+        // 6. Windows Shortcuts: Win + L to Lock Screen (Option + Command + L)
+        let winL = defaults.object(forKey: "winLToLockEnabled") as? Bool ?? true
+        if type == .keyDown && winL && keyCode == 37 && flags.contains(.maskAlternate) && flags.contains(.maskCommand) {
+            DispatchQueue.global(qos: .userInitiated).async {
+                let task = Process()
+                task.launchPath = "/usr/bin/pmset"
+                task.arguments = ["displaysleepnow"]
+                try? task.run()
             }
-        } else {
             return nil
         }
         
-        // 7. Ctrl to Cmd Key Remapping (Ctrl+C/V/Z/Y/A/S/F/W/T/P/N/R)
-        if let ctrlResult = CtrlToCmdMapper.shared.handleKeyEvent(type: type, event: event) {
-            if ctrlResult !== event {
-                return Unmanaged.passRetained(ctrlResult)
+        // 7. Windows Shortcuts: Ctrl + Shift + Esc -> Task Manager (Activity Monitor)
+        let ctrlShiftEsc = defaults.object(forKey: "ctrlShiftEscTaskManager") as? Bool ?? true
+        if type == .keyDown && ctrlShiftEsc && keyCode == 53 && flags.contains(.maskControl) && flags.contains(.maskShift) {
+            DispatchQueue.main.async {
+                NSWorkspace.shared.openApplication(
+                    at: URL(fileURLWithPath: "/System/Applications/Utilities/Activity Monitor.app"),
+                    configuration: NSWorkspace.OpenConfiguration()
+                )
             }
-        } else {
             return nil
         }
         
