@@ -38,31 +38,19 @@ public final class SnapEngine: @unchecked Sendable {
     
     private init() {}
     
-    // MARK: - Drag to Snap Engine
+    // MARK: - Drag to Snap Engine (Rectangle Aero Snap)
     public func handleMouseDrag(point: CGPoint) {
         guard UserDefaults.standard.object(forKey: "dragToSnapEnabled") as? Bool ?? true else { return }
         
-        let primaryMaxY = NSScreen.screens.first?.frame.maxY ?? 0
-        
-        // Find screen containing this Quartz point (point.y starts at 0 at top of primary screen)
-        guard let screen = NSScreen.screens.first(where: { s in
-            let qMinX = s.frame.minX
-            let qMaxX = s.frame.maxX
-            let qMinY = primaryMaxY - s.frame.maxY
-            let qMaxY = primaryMaxY - s.frame.minY
-            return point.x >= qMinX && point.x <= qMaxX && point.y >= qMinY && point.y <= qMaxY
-        }) ?? NSScreen.main else {
+        let cocoaPoint = NSPoint(x: point.x, y: point.y)
+        guard let screen = NSScreen.screens.first(where: { NSMouseInRect(cocoaPoint, $0.frame, false) }) ?? NSScreen.main else {
             return
         }
         
-        let qMinX = screen.frame.minX
-        let qMaxX = screen.frame.maxX
-        let qMinY = primaryMaxY - screen.frame.maxY
-        let qMaxY = primaryMaxY - screen.frame.minY
-        
+        let sFrame = screen.frame
         let visibleFrame = screen.visibleFrame
-        let edgeThreshold: CGFloat = 30.0
-        let cornerThreshold: CGFloat = 80.0
+        let edgeThreshold: CGFloat = 25.0
+        let cornerThreshold: CGFloat = 70.0
         
         var targetAction: SnapAction?
         var previewRect: NSRect?
@@ -70,12 +58,12 @@ public final class SnapEngine: @unchecked Sendable {
         let halfW = visibleFrame.width / 2.0
         let halfH = visibleFrame.height / 2.0
         
-        // 1. Top Edge (Quartz point.y near qMinY)
-        if point.y <= qMinY + edgeThreshold {
-            if point.x <= qMinX + cornerThreshold {
+        // 1. Top Edge & Corners (Cocoa Y near sFrame.maxY)
+        if cocoaPoint.y >= sFrame.maxY - edgeThreshold {
+            if cocoaPoint.x <= sFrame.minX + cornerThreshold {
                 targetAction = .topLeftQuarter
                 previewRect = NSRect(x: visibleFrame.minX, y: visibleFrame.minY + halfH, width: halfW, height: halfH)
-            } else if point.x >= qMaxX - cornerThreshold {
+            } else if cocoaPoint.x >= sFrame.maxX - cornerThreshold {
                 targetAction = .topRightQuarter
                 previewRect = NSRect(x: visibleFrame.minX + halfW, y: visibleFrame.minY + halfH, width: halfW, height: halfH)
             } else {
@@ -83,12 +71,12 @@ public final class SnapEngine: @unchecked Sendable {
                 previewRect = visibleFrame
             }
         }
-        // 2. Bottom Edge (Quartz point.y near qMaxY)
-        else if point.y >= qMaxY - edgeThreshold {
-            if point.x <= qMinX + cornerThreshold {
+        // 2. Bottom Edge & Corners (Cocoa Y near sFrame.minY)
+        else if cocoaPoint.y <= sFrame.minY + edgeThreshold {
+            if cocoaPoint.x <= sFrame.minX + cornerThreshold {
                 targetAction = .bottomLeftQuarter
                 previewRect = NSRect(x: visibleFrame.minX, y: visibleFrame.minY, width: halfW, height: halfH)
-            } else if point.x >= qMaxX - cornerThreshold {
+            } else if cocoaPoint.x >= sFrame.maxX - cornerThreshold {
                 targetAction = .bottomRightQuarter
                 previewRect = NSRect(x: visibleFrame.minX + halfW, y: visibleFrame.minY, width: halfW, height: halfH)
             } else {
@@ -97,12 +85,12 @@ public final class SnapEngine: @unchecked Sendable {
             }
         }
         // 3. Left Edge
-        else if point.x <= qMinX + edgeThreshold {
+        else if cocoaPoint.x <= sFrame.minX + edgeThreshold {
             targetAction = .leftHalf
             previewRect = NSRect(x: visibleFrame.minX, y: visibleFrame.minY, width: halfW, height: visibleFrame.height)
         }
         // 4. Right Edge
-        else if point.x >= qMaxX - edgeThreshold {
+        else if cocoaPoint.x >= sFrame.maxX - edgeThreshold {
             targetAction = .rightHalf
             previewRect = NSRect(x: visibleFrame.minX + halfW, y: visibleFrame.minY, width: halfW, height: visibleFrame.height)
         }

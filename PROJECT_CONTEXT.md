@@ -18,10 +18,12 @@
 
 ## 📝 Sürüm Geçmişi (Changelog)
 
-### Sürüm 3.9.0 (Güncel)
-- **LinearMouse IOHID Kernel Mimarisi Entegrasyonu (`ScrollInverter.swift`):** LinearMouse projesinin orijinal donanımsal fare kontrol mekanizması olan `IOHIDEventSystemClient` ve `IOHIDServiceClient` çekirdek API'leri dinamik olarak bağlandı. `HIDPointerAcceleration` (-65536 ile doğrusal 1:1 ivme) ve `HIDPointerResolution` kernel seviyesinde 0ms gecikmeyle donanıma doğrudan uygulanır.
-- **Hardware HID EventTap (`.cghidEventTap`):** LinearMouse standardında donanım seviyesi event tap önceliklendirildi.
-- **Cmd + Tekerlek Zoom & Shift + Tekerlek Yatay Kaydırma:** LinearMouse'un `CGEvent` in-place eksen dönüştürücüsü ve `CGEventSource` sentezleyici motoru birebir uyarlandı.
+### Sürüm 4.0.0 (Güncel)
+- **Rectangle Pro Standardında Donuk Cam Önizleme:** `SnapOverlayController.swift` içerisindeki neon mavi tasarım kaldırılarak macOS Sequoia ve Rectangle Pro standartlarında koyu buzlu cam (`VisualEffectBlur`), transparan dolgu ve beyaz mikro çerçeve uygulandı.
+- **Doğru Ekran Koordinatlarıyla Aero Snap:** `SnapEngine.swift` içerisindeki Quartz/Cocoa koordinat uyuşmazlığı düzeltildi. Fare ekranın kenarına veya köşesine götürüldüğünde anında ve hatasız algılanır.
+- **Ayrık & Kesintisiz Olay Mimarisi (Timeout Önleme):** Yüksek frekanslı `mouseMoved` olayları aktif `CGEventTap` filtresinden çıkarılarak Cocoa'nın yerel `NSEvent.addGlobalMonitorForEvents` seviyesine taşındı. Böylece macOS WindowServer'ın EventTap'i kapatması (`kCGEventTapDisabledByTimeout`) tamamen engellendi; LinearMouse kaydırma ve zoom motoru 7/24 kesintisiz çalışır hale getirildi.
+
+### Sürüm 3.9.0
 
 ### Sürüm 3.8.0
 

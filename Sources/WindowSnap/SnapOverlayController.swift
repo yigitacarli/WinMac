@@ -17,19 +17,25 @@ public final class SnapOverlayController {
         
         guard let panel = panel else { return }
         
-        // If rect didn't change and already visible, do nothing
         if panel.isVisible && currentRect.equalTo(rect) {
             return
         }
         
         self.currentRect = rect
-        panel.setFrame(rect, display: true, animate: panel.isVisible)
         
-        if !panel.isVisible {
-            panel.alphaValue = 0
-            panel.orderFrontRegardless()
+        if panel.isVisible {
             NSAnimationContext.runAnimationGroup { context in
                 context.duration = 0.12
+                context.timingFunction = CAMediaTimingFunction(name: .easeOut)
+                panel.animator().setFrame(rect, display: true)
+            }
+        } else {
+            panel.setFrame(rect, display: true)
+            panel.alphaValue = 0.0
+            panel.orderFrontRegardless()
+            NSAnimationContext.runAnimationGroup { context in
+                context.duration = 0.14
+                context.timingFunction = CAMediaTimingFunction(name: .easeOut)
                 panel.animator().alphaValue = 1.0
             }
         }
@@ -59,39 +65,48 @@ public final class SnapOverlayController {
         
         p.isOpaque = false
         p.backgroundColor = .clear
-        p.level = .screenSaver
+        p.level = .floating
         p.hasShadow = false
         p.ignoresMouseEvents = true
         p.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
         
-        p.contentView = NSHostingView(rootView: SnapGhostView())
+        p.contentView = NSHostingView(rootView: PremiumSnapGhostView())
         self.panel = p
     }
 }
 
-private struct SnapGhostView: View {
+// MARK: - Rectangle Pro / Native macOS Sequoia Translucent Frosted Glass Ghost View
+
+private struct PremiumSnapGhostView: View {
     var body: some View {
         ZStack {
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(
-                    LinearGradient(
-                        colors: [Color.blue.opacity(0.28), Color.cyan.opacity(0.18)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
+            // Frosted backdrop
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(Color.black.opacity(0.20))
+                .background(
+                    VisualEffectBlur(material: .fullScreenUI, blendingMode: .withinWindow)
+                        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                 )
             
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
+            // Subtle translucent fill
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(Color.white.opacity(0.08))
+            
+            // Crisp refined hairline border
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .stroke(
                     LinearGradient(
-                        colors: [Color.blue.opacity(0.85), Color.cyan.opacity(0.65)],
+                        colors: [
+                            Color.white.opacity(0.40),
+                            Color.white.opacity(0.15)
+                        ],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     ),
-                    lineWidth: 2.5
+                    lineWidth: 1.5
                 )
         }
-        .padding(6)
-        .shadow(color: Color.blue.opacity(0.4), radius: 16, y: 4)
+        .padding(8)
+        .shadow(color: Color.black.opacity(0.35), radius: 24, y: 6)
     }
 }
