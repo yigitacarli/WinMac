@@ -65,8 +65,8 @@ public struct SettingsView: View {
                     VStack(alignment: .leading, spacing: 1) {
                         Text("WinMac")
                             .font(.system(size: 13, weight: .bold))
-                        Text("v4.3.0 Pro")
-                            .font(.system(size: 10, weight: .medium, design: .monospaced))
+                        Text("v1.1")
+                            .font(.system(size: 10.5, weight: .medium, design: .monospaced))
                             .foregroundColor(.secondary)
                     }
                 }
@@ -92,23 +92,8 @@ public struct SettingsView: View {
                 .padding(.horizontal, 8)
                 
                 Spacer()
-                
-                // Permission Status Mini-Badge
-                HStack(spacing: 8) {
-                    Circle()
-                        .fill(permissions.hasAccessibilityPermission ? Color.green : Color.red)
-                        .frame(width: 7, height: 7)
-                    
-                    Text(permissions.hasAccessibilityPermission ? "Erişilebilirlik Aktif" : "İzin Gerekli")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundColor(.secondary)
-                    
-                    Spacer()
-                }
-                .padding(.horizontal, 14)
-                .padding(.bottom, 12)
             }
-            .frame(width: 190)
+            .frame(width: 185)
             .background(Color(NSColor.windowBackgroundColor).opacity(0.6))
             
             Divider()
@@ -134,7 +119,7 @@ public struct SettingsView: View {
             }
             .background(Color(NSColor.controlBackgroundColor).opacity(0.4))
         }
-        .frame(width: 680, height: 490)
+        .frame(width: 670, height: 480)
     }
 }
 
@@ -274,7 +259,7 @@ private struct SettingRow<Trailing: View>: View {
     }
 }
 
-// MARK: - Apple-Style Keyboard Shortcut Keycap
+// MARK: - Keyboard Keycap
 
 private struct Keycap: View {
     let text: String
@@ -305,16 +290,16 @@ private struct SnapSettingsContent: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             SectionHeader(
-                title: "Pencere Yaslama (Window Snap)",
+                title: "Pencere Yaslama",
                 subtitle: "Ekran kenarlarına sürükleyerek veya kısayollarla pencereleri anında hizalayın."
             )
             
-            SettingsCard(title: "Sürükle-Yasla (Aero Snap)") {
+            SettingsCard(title: "Sürükle-Yasla") {
                 SettingRow(
                     icon: "cursorarrow.motionlines",
                     iconColor: .blue,
                     title: "Sürükle-Yasla Önizlemesini Etkinleştir",
-                    subtitle: "Pencereleri ekran kenarlarına veya köşelerine sürüklediğinizde buzlu cam önizleme kutusu gösterir."
+                    subtitle: "Pencereleri ekran kenarlarına veya köşelerine sürüklediğinizde önizleme kutusu gösterir."
                 ) {
                     Toggle("", isOn: $settings.dragToSnapEnabled)
                         .labelsHidden()
@@ -355,7 +340,7 @@ private struct SnapSettingsContent: View {
                     ShortcutItem(keys: "⌥ ⌃ ← / →", desc: "Sol / Sağ Yarı (Döngülü)")
                     ShortcutItem(keys: "⌥ ⌃ ↑", desc: "Tam Ekran")
                     ShortcutItem(keys: "⌥ ⌃ ↓", desc: "Alt Yarı Ekran")
-                    ShortcutItem(keys: "⌥ ⌃ Return", desc: "Tam Ekran (Maximize)")
+                    ShortcutItem(keys: "⌥ ⌃ Return", desc: "Tam Ekran")
                     ShortcutItem(keys: "⌥ ⌃ C", desc: "Merkeze Al")
                     ShortcutItem(keys: "⌥ ⌃ U / I", desc: "Sol Üst / Sağ Üst Çeyrek")
                     ShortcutItem(keys: "⌥ ⌃ J / K", desc: "Sol Alt / Sağ Alt Çeyrek")
@@ -392,15 +377,15 @@ private struct MouseSettingsContent: View {
         VStack(alignment: .leading, spacing: 14) {
             SectionHeader(
                 title: "Fare & İmleç Denetimi",
-                subtitle: "Windows tarzı doğrusal ivme, donanım DPI hassasiyeti ve tekerlek yönü ayrımı."
+                subtitle: "Doğrusal ivme, donanım DPI hassasiyeti ve tekerlek yönü denetimi."
             )
             
-            SettingsCard(title: "Windows İvme & Hız") {
+            SettingsCard(title: "İmleç İvmesi & Hız") {
                 SettingRow(
                     icon: "speedometer",
                     iconColor: .teal,
                     title: "Doğrusal Fare İvmesi (1:1 Hassasiyet)",
-                    subtitle: "macOS hızlandırma eğrisini sıfırlayarak Windows'taki gibi sabit 1:1 net ve kesintisiz fare kontrolü sağlar."
+                    subtitle: "macOS ivmelenme eğrisini sıfırlayarak sabit 1:1 net ve kesintisiz fare kontrolü sağlar."
                 ) {
                     Toggle("", isOn: $settings.disableMouseAcceleration)
                         .labelsHidden()
@@ -411,7 +396,7 @@ private struct MouseSettingsContent: View {
                 
                 VStack(alignment: .leading, spacing: 6) {
                     HStack {
-                        Text("Fare İmleç Hassasiyeti / DPI Hızı")
+                        Text("Fare İmleç Hassasiyeti / Hızı")
                             .font(.system(size: 12.5, weight: .medium))
                         Spacer()
                         Text(String(format: "%.1fx", settings.mousePointerSensitivity))
@@ -476,7 +461,7 @@ private struct SwitcherSettingsContent: View {
         VStack(alignment: .leading, spacing: 14) {
             SectionHeader(
                 title: "Pencere Değiştirici (Alt + Tab)",
-                subtitle: "Windows tarzı zengin pencere switcher arayüzü ve hızlı klavye gezinimi."
+                subtitle: "Gelişmiş pencere switcher arayüzü ve hızlı klavye gezinimi."
             )
             
             SettingsCard(title: "Genel") {
@@ -552,8 +537,8 @@ private struct ToolsSettingsContent: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             SectionHeader(
-                title: "Pano Geçmişi & Kısayollar",
-                subtitle: "Option + V pano geçmişi, SwiftQuit ve Windows klavye kısayolları."
+                title: "Pano & Kısayollar",
+                subtitle: "Option + V pano geçmişi, otomatik çıkış ve sistem kısayolları."
             )
             
             SettingsCard(title: "Pano Geçmişi") {
@@ -587,12 +572,12 @@ private struct ToolsSettingsContent: View {
                 }
             }
             
-            SettingsCard(title: "SwiftQuit & Windows Kısayolları") {
+            SettingsCard(title: "Otomatik Çıkış & Kısayollar") {
                 SettingRow(
                     icon: "xmark.circle",
                     iconColor: .red,
-                    title: "SwiftQuit (Son Pencere Kapanınca Çık)",
-                    subtitle: "Bir uygulamanın son penceresi kapandığında uygulamayı arka planda açık bırakmaz, otomatik kapatır."
+                    title: "Pencere Kapanınca Otomatik Çıkış",
+                    subtitle: "Bir uygulamanın son penceresi kapandığında uygulamayı arka planda açık bırakmaz, otomatik olarak sonlandırır."
                 ) {
                     Toggle("", isOn: $settings.swiftQuitEnabled)
                         .labelsHidden()
@@ -618,7 +603,7 @@ private struct ToolsSettingsContent: View {
                     icon: "gauge.with.needle",
                     iconColor: .blue,
                     title: "Ctrl + Shift + Esc -> Etkinlik Monitörü",
-                    subtitle: "Windows Görev Yöneticisi kısayolu ile macOS Etkinlik Monitörü'nü açar."
+                    subtitle: "Etkinlik Monitörü'nü anında açmak için hızlı sistem kısayolu."
                 ) {
                     Toggle("", isOn: $settings.ctrlShiftEscTaskManager)
                         .labelsHidden()
@@ -639,7 +624,7 @@ private struct GeneralSettingsContent: View {
         VStack(alignment: .leading, spacing: 14) {
             SectionHeader(
                 title: "Genel & Sistem İzinleri",
-                subtitle: "Uygulama davranışları ve macOS erişilebilirlik izinleri."
+                subtitle: "Uygulama davranışları ve sistem erişilebilirlik izinleri."
             )
             
             SettingsCard(title: "Sistem İzinleri") {
@@ -656,7 +641,7 @@ private struct GeneralSettingsContent: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(permissions.hasAccessibilityPermission ? "Erişilebilirlik İzni Verildi" : "Erişilebilirlik İzni Gerekli")
                             .font(.system(size: 13, weight: .semibold))
-                        Text(permissions.hasAccessibilityPermission ? "Tüm pencere yaslama ve fare özellikleri sorunsuz çalışıyor." : "Pencere yaslama ve fare kontrolleri için Sistem Ayarları'ndan izin vermeniz gerekir.")
+                        Text(permissions.hasAccessibilityPermission ? "Pencere yönetimi ve fare kontrolleri etkin." : "Pencere yaslama ve fare denetimi için Sistem Ayarları'ndan izin vermeniz gerekir.")
                             .font(.system(size: 11))
                             .foregroundColor(.secondary)
                     }
@@ -690,9 +675,9 @@ private struct GeneralSettingsContent: View {
             SettingsCard(title: "Hakkında") {
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("WinMac for macOS")
+                        Text("WinMac")
                             .font(.system(size: 13, weight: .semibold))
-                        Text("AltTab, Rectangle, LinearMouse ve SwiftQuit'i birleştiren hafif sistem aracı.")
+                        Text("macOS için gelişmiş pencere yönetimi, fare denetimi ve verimlilik araçları.")
                             .font(.system(size: 11))
                             .foregroundColor(.secondary)
                     }

@@ -7,20 +7,21 @@
 
 ## 📌 Proje Özeti & Vizyon
 - **Proje Adı:** WinMac
-- **Sürüm:** v4.3.0
+- **Sürüm:** v1.1
 - **Son Güncelleme:** 15 Ağustos 2026
-- **Ana Hedef:** macOS üzerinde Windows kullanıcılarının alıştığı akıcı deneyimi (Pencere Yaslama, LinearMouse 1:1 ivme & DPI, Alt+Tab, Pano Geçmişi, SwiftQuit) tek bir native, hafif ve modern Swift uygulamasında sunmak.
+- **Ana Hedef:** macOS için gelişmiş pencere yönetimi, fare denetimi ve verimlilik araçlarını tek bir native, hafif ve modern Swift uygulamasında sunmak.
 
 ---
 
-## 🚀 Son Yapılan Güncellemeler (v4.3.0 - Major Refactor):
-1. **Fare İmleç Hızı (DPI 16.16 Fixed Point) & 1:1 Doğrusal İvme:**
-   - IOKit donanım seviyesinde `HIDPointerResolution` 16.16 fixed-point (`DPI * 65536`) formatına geçirildi. Hassasiyet kaydırıcısı donanım çözünürlüğünü doğrudan ölçeklendirerek farenin hızını anında değiştiriyor.
-   - İhtiyaç duyulmayan tekerlek modifikatörleri kaldırıldı; arayüz ve çekirdek sadece ters kaydırma, yatay kaydırma ve kaydırma hızına odaklandı.
-2. **Modern Pencere Yaslama (Frosted Glass Aero Snap):**
-   - Önizleme kutusu tamamen yenilendi: Native `NSVisualEffectView` (.hudWindow) buzlu cam, akıcı yay (spring/morph) animasyonları ve yön rozetleri eklendi.
-3. **Apple Native Ayarlar Arayüzü:**
-   - AI şablonu hissi veren tüm hantal kutular ve gereksiz öğeler kaldırıldı; Apple/Raycast tarzı zarif kenar çubuğu, pastel SF Symbol rozetleri, inset kartlar ve gerçekçi klavye tuş başlıkları (keycaps) ile sıfırdan tasarlandı.
+## 🚀 Sürüm 1.1 Değişiklikleri:
+1. **Pencere Yaslama Teması:**
+   - Önizleme kutusu Rectangle tarzı minimalist yarı saydam çerçeve (`NSBox`, 6px corner radius, `windowFrameTextColor.withAlphaComponent(0.2)`) ile tam uyumlu hale getirildi.
+2. **Doğrusal Fare İvmesi & DPI Hızı:**
+   - 1:1 doğrusal ivme aktifken de hassasiyet/DPI kaydırıcısının farenin hızını doğrudan ve orantılı olarak değiştirmesi sağlandı (`com.apple.mouse.scaling` kilitlenmesi kaldırıldı, 16.16 fixed-point IOHID DPI uygulandı).
+3. **Arayüz ve Sadeleştirme:**
+   - Üçüncü taraf uygulama isimleri kaldırıldı; özellikler "Pencere Kapanınca Otomatik Çıkış", "Pencere Yaslama", "Pencere Değiştirici" olarak adlandırıldı.
+   - Sürüm numaralandırması sadeleştirilerek v1.1'e çekildi.
+   - Kenar çubuğu ve ayarlar görünümü minimalist Apple standartlarına uyarlandı.
 
 ---
 

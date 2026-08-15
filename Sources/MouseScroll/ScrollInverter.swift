@@ -179,7 +179,7 @@ public final class ScrollInverter: @unchecked Sendable {
         DispatchQueue.global(qos: .utility).async {
             let task = Process()
             task.launchPath = "/usr/bin/defaults"
-            let scaleVal = linear ? "-1" : String(format: "%.2f", sensitivity * 1.5)
+            let scaleVal = String(format: "%.2f", max(0.1, sensitivity * 1.5))
             task.arguments = ["write", "-g", "com.apple.mouse.scaling", scaleVal]
             try? task.run()
         }
