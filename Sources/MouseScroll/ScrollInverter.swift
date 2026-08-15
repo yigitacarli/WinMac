@@ -12,14 +12,12 @@ public final class ScrollInverter: @unchecked Sendable {
     
     // MARK: - IOHID Dynamic Function Pointers (LinearMouse Architecture)
     private typealias IOHIDEventSystemClientCreateFunc = @convention(c) (CFAllocator?) -> UnsafeMutableRawPointer?
-    private typealias IOHIDEventSystemClientSetMatchingFunc = @convention(c) (UnsafeMutableRawPointer, CFDictionary?) -> Void
     private typealias IOHIDEventSystemClientCopyServicesFunc = @convention(c) (UnsafeMutableRawPointer) -> CFArray?
     private typealias IOHIDServiceClientSetPropertyFunc = @convention(c) (UnsafeRawPointer, CFString, CFTypeRef) -> Bool
     private typealias IOHIDServiceClientCopyPropertyFunc = @convention(c) (UnsafeRawPointer, CFString) -> Unmanaged<CFTypeRef>?
     
     private var iohidHandle: UnsafeMutableRawPointer?
     private var iohidCreate: IOHIDEventSystemClientCreateFunc?
-    private var iohidSetMatching: IOHIDEventSystemClientSetMatchingFunc?
     private var iohidCopyServices: IOHIDEventSystemClientCopyServicesFunc?
     private var iohidServiceSetProp: IOHIDServiceClientSetPropertyFunc?
     private var iohidServiceCopyProp: IOHIDServiceClientCopyPropertyFunc?
@@ -38,9 +36,6 @@ public final class ScrollInverter: @unchecked Sendable {
         if let createSym = dlsym(handle, "IOHIDEventSystemClientCreate") {
             self.iohidCreate = unsafeBitCast(createSym, to: IOHIDEventSystemClientCreateFunc.self)
         }
-        if let matchSym = dlsym(handle, "IOHIDEventSystemClientSetMatching") {
-            self.iohidSetMatching = unsafeBitCast(matchSym, to: IOHIDEventSystemClientSetMatchingFunc.self)
-        }
         if let copyServicesSym = dlsym(handle, "IOHIDEventSystemClientCopyServices") {
             self.iohidCopyServices = unsafeBitCast(copyServicesSym, to: IOHIDEventSystemClientCopyServicesFunc.self)
         }
@@ -52,10 +47,10 @@ public final class ScrollInverter: @unchecked Sendable {
         }
     }
     
-    // MARK: - Scroll Wheel Event Processing (LinearMouse Transformer Pipeline)
+    // MARK: - Scroll Wheel Event Processing
     public func handleScrollEvent(event: CGEvent) -> CGEvent? {
         let defaults = UserDefaults.standard
-        let invertV = defaults.object(forKey: "invertMouseWheel") as? Bool ?? true
+        let invertV = defaults.object(forKey: "invertMouseWheel") as? Bool ?? false
         let invertH = defaults.object(forKey: "invertHorizontalScroll") as? Bool ?? false
         var speedMult = defaults.object(forKey: "scrollSpeedMultiplier") as? Double ?? 1.0
         
@@ -65,7 +60,7 @@ public final class ScrollInverter: @unchecked Sendable {
         let ctrlSlow = defaults.object(forKey: "ctrlSlowScrollEnabled") as? Bool ?? true
         
         // 1. Strict Trackpad vs External Physical Mouse Distinction
-        // On macOS: Trackpads & Touch gestures ALWAYS have scrollWheelEventIsContinuous != 0 (1).
+        // On macOS: Trackpads & Touch surfaces ALWAYS have scrollWheelEventIsContinuous != 0.
         // Physical notched mouse wheels ALWAYS have scrollWheelEventIsContinuous == 0.
         let isContinuous = event.getIntegerValueField(.scrollWheelEventIsContinuous) != 0
         if isContinuous {
@@ -129,7 +124,7 @@ public final class ScrollInverter: @unchecked Sendable {
             speedMult *= 0.3
         }
         
-        // 5. Invert Vertical Scroll for Physical Mouse
+        // 5. Invert Vertical Scroll for Physical Mouse (if enabled)
         if invertV {
             deltaY = -deltaY
             pointDeltaY = -pointDeltaY
@@ -182,32 +177,50 @@ public final class ScrollInverter: @unchecked Sendable {
         lastLinearAccel = linear
         lastPointerSensitivity = sensitivity
         
-        // 1. Apply hardware acceleration property via IOHIDEventSystemClient & IOHIDServiceClient
+        let baseResolution: Double = 800.0
+        let targetResolution = max(100.0, baseResolution / sensitivity)
+        
+        // 1. Apply hardware acceleration & resolution properties directly to all external pointer services
         if let createFn = self.iohidCreate,
            let copyServicesFn = self.iohidCopyServices,
            let serviceSetPropFn = self.iohidServiceSetProp,
+           let serviceCopyPropFn = self.iohidServiceCopyProp,
            let client = createFn(kCFAllocatorDefault) {
-            
-            if let setMatchingFn = self.iohidSetMatching {
-                let matching: [String: Any] = [
-                    "PrimaryUsagePage": 1, // Generic Desktop
-                    "PrimaryUsage": 2       // Mouse
-                ]
-                setMatchingFn(client, matching as CFDictionary)
-            }
             
             if let services = copyServicesFn(client) {
                 let count = CFArrayGetCount(services)
                 for i in 0..<count {
                     if let service = CFArrayGetValueAtIndex(services, i) {
-                        if linear {
-                            // -1.0 CFNumber completely disables macOS non-linear acceleration curve
-                            let accelVal = -1.0 as CFNumber
-                            _ = serviceSetPropFn(service, "HIDMouseAcceleration" as CFString, accelVal)
-                            _ = serviceSetPropFn(service, "HIDPointerAcceleration" as CFString, accelVal)
-                        } else {
-                            let accelVal = (sensitivity * 65536.0) as CFNumber
-                            _ = serviceSetPropFn(service, "HIDMouseAcceleration" as CFString, accelVal)
+                        let product = serviceCopyPropFn(service, "Product" as CFString)?.takeRetainedValue()
+                        let prodStr = "\(product ?? "" as CFTypeRef)"
+                        let transport = serviceCopyPropFn(service, "Transport" as CFString)?.takeRetainedValue()
+                        let transStr = "\(transport ?? "" as CFTypeRef)"
+                        let usagePage = serviceCopyPropFn(service, "PrimaryUsagePage" as CFString)?.takeRetainedValue() as? Int ?? 0
+                        let usage = serviceCopyPropFn(service, "PrimaryUsage" as CFString)?.takeRetainedValue() as? Int ?? 0
+                        
+                        let isInternal = prodStr.contains("Internal") || prodStr.contains("Apple Internal")
+                        let isExternalTransport = transStr == "USB" || transStr == "Bluetooth" || transStr == "BTH"
+                        let isPointerUsage = (usagePage == 1 && (usage == 1 || usage == 2 || usage == 6))
+                        let isMouseProduct = prodStr.localizedCaseInsensitiveContains("mouse") ||
+                                             prodStr.localizedCaseInsensitiveContains("receiver") ||
+                                             prodStr.localizedCaseInsensitiveContains("wireless") ||
+                                             prodStr.localizedCaseInsensitiveContains("pointer") ||
+                                             prodStr.localizedCaseInsensitiveContains("trackball")
+                        
+                        if !isInternal && (isExternalTransport || isMouseProduct || isPointerUsage) {
+                            if linear {
+                                // -1.0 disables macOS non-linear acceleration curve
+                                let accelVal = -1.0 as CFNumber
+                                _ = serviceSetPropFn(service, "HIDMouseAcceleration" as CFString, accelVal)
+                                _ = serviceSetPropFn(service, "HIDPointerAcceleration" as CFString, accelVal)
+                            } else {
+                                let accelVal = (sensitivity * 65536.0) as CFNumber
+                                _ = serviceSetPropFn(service, "HIDMouseAcceleration" as CFString, accelVal)
+                                _ = serviceSetPropFn(service, "HIDPointerAcceleration" as CFString, accelVal)
+                            }
+                            
+                            let resVal = targetResolution as CFNumber
+                            _ = serviceSetPropFn(service, "HIDPointerResolution" as CFString, resVal)
                         }
                     }
                 }

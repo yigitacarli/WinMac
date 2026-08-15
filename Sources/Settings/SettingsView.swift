@@ -367,8 +367,8 @@ private struct MouseSettingsContent: View {
             SettingsGroup(title: "Tekerlek Yönü & Ayrımı") {
                 ModernRow(
                     icon: "computermouse",
-                    title: "Harici Fare için Standart Yön (Ters Kaydırma)",
-                    subtitle: "Tekerlek aşağı çevrildiğinde sayfa aşağı kayar. Trackpad doğal kaydırmada kalır ve jestlere dokunulmaz.",
+                    title: "Fare Tekerlek Yönünü Tersine Çevir",
+                    subtitle: "Fare tekerleğinin dikey kaydırma yönünü tersine çevirir. Trackpad doğal kaydırmada kalır ve jestlere dokunulmaz.",
                     content: {
                         Toggle("", isOn: $settings.invertMouseWheel)
                             .labelsHidden()

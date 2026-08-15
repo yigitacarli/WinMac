@@ -204,7 +204,7 @@ public final class AppSettings: ObservableObject {
         self.hideHiddenApps = defaults.object(forKey: "hideHiddenApps") as? Bool ?? false
         self.itemSize = defaults.object(forKey: "itemSize") as? Double ?? 1.0
         
-        self.invertMouseWheel = defaults.object(forKey: "invertMouseWheel") as? Bool ?? true
+        self.invertMouseWheel = defaults.object(forKey: "invertMouseWheel") as? Bool ?? false
         self.invertHorizontalScroll = defaults.object(forKey: "invertHorizontalScroll") as? Bool ?? false
         self.smoothScrollEnabled = defaults.object(forKey: "smoothScrollEnabled") as? Bool ?? true
         self.disableMouseAcceleration = defaults.object(forKey: "disableMouseAcceleration") as? Bool ?? false
