@@ -51,7 +51,7 @@ public final class EventTapManager: @unchecked Sendable {
         }
         
         var tap = CGEvent.tapCreate(
-            tap: .cgSessionEventTap,
+            tap: .cghidEventTap,
             place: .headInsertEventTap,
             options: .defaultTap,
             eventsOfInterest: eventMask,
@@ -61,7 +61,7 @@ public final class EventTapManager: @unchecked Sendable {
         
         if tap == nil {
             tap = CGEvent.tapCreate(
-                tap: .cghidEventTap,
+                tap: .cgSessionEventTap,
                 place: .headInsertEventTap,
                 options: .defaultTap,
                 eventsOfInterest: eventMask,

@@ -18,12 +18,12 @@
 
 ## 📝 Sürüm Geçmişi (Changelog)
 
-### Sürüm 3.8.0 (Güncel)
-- **Güvenli İzin Yönetimi & Kilitlenme Koruması:** Kullanıcı Sistem Ayarlarından WinMac'in erişilebilirlik iznini kaldırdığında veya yetki düştüğünde, `EventTapManager` hemen dinlemeyi durdurur (`stop()`). Sonsuz döngü ve macOS giriş kilitlenmesi (fare/klavye donması) tamamen önlendi.
-- **Spotify Auto-Quit Desteği:** `AppSettings.swift` içerisindeki varsayılan hariç tutma listesinden `com.spotify.client` kaldırıldı; Spotify kapatıldığında artık otomatik olarak sonlanır.
-- **Kaybolmayan Sarmal Sekme Menüsü:** Küçük veya dar pencerelerde yatayda taşan sekmeler yerine ekran genişliğine göre otomatik satırlara katlanan `LazyVGrid` sekme ızgarası uygulandı.
-- **LinearMouse Tabanlı Fare & Yakınlaştırma (Zoom) Motoru:** `Cmd+Tekerlek` ile `CGEventSource` üzerinden evrensel Zoom In / Zoom Out (`Cmd + +` / `Cmd + -`) sentezi, `Shift+Tekerlek` yatay kaydırma ve `-g com.apple.mouse.scaling` üzerinden sistem geneli imleç hassasiyeti tamamlandı.
-- **Gereksiz README.md Dosyası Kaldırıldı:** Kullanıcı talebi doğrultusunda `README.md` projeden silindi.
+### Sürüm 3.9.0 (Güncel)
+- **LinearMouse IOHID Kernel Mimarisi Entegrasyonu (`ScrollInverter.swift`):** LinearMouse projesinin orijinal donanımsal fare kontrol mekanizması olan `IOHIDEventSystemClient` ve `IOHIDServiceClient` çekirdek API'leri dinamik olarak bağlandı. `HIDPointerAcceleration` (-65536 ile doğrusal 1:1 ivme) ve `HIDPointerResolution` kernel seviyesinde 0ms gecikmeyle donanıma doğrudan uygulanır.
+- **Hardware HID EventTap (`.cghidEventTap`):** LinearMouse standardında donanım seviyesi event tap önceliklendirildi.
+- **Cmd + Tekerlek Zoom & Shift + Tekerlek Yatay Kaydırma:** LinearMouse'un `CGEvent` in-place eksen dönüştürücüsü ve `CGEventSource` sentezleyici motoru birebir uyarlandı.
+
+### Sürüm 3.8.0
 
 ### Sürüm 3.7.0
 
