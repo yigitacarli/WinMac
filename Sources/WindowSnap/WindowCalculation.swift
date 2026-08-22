@@ -3,7 +3,7 @@ import CoreGraphics
 
 public struct WindowCalculation {
     
-    public static func calculateRect(for action: SnapAction, visibleFrame: CGRect, gaps: CGFloat = 0) -> CGRect {
+    public static func calculateRect(for action: SnapAction, visibleFrame: CGRect, gaps: CGFloat = 0, almostMaximizePadding: CGFloat = 24) -> CGRect {
         let adjustedFrame = visibleFrame.insetBy(dx: gaps, dy: gaps)
         
         let halfWidth = (adjustedFrame.width - gaps) / 2.0
@@ -46,6 +46,10 @@ public struct WindowCalculation {
             
         case .maximize:
             return adjustedFrame
+            
+        case .almostMaximize:
+            let pad = max(8.0, almostMaximizePadding)
+            return visibleFrame.insetBy(dx: pad, dy: pad)
             
         case .topLeftQuarter:
             return CGRect(

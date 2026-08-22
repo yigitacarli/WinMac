@@ -79,7 +79,7 @@ public final class SwiftQuitEngine {
             object: nil
         )
         
-        print("[WinMac] AutoQuitEngine started safely.")
+        print("[WinMac SwiftQuit] Engine safely active.")
     }
     
     public func stop() {
@@ -87,6 +87,20 @@ public final class SwiftQuitEngine {
         pendingTerminationTasks.values.forEach { $0.cancel() }
         pendingTerminationTasks.removeAll()
         NSWorkspace.shared.notificationCenter.removeObserver(self)
+    }
+    
+    public func addExcludedApp(bundleId: String) {
+        var list = AppSettings.shared.swiftQuitExcludedApps
+        if !list.contains(bundleId) {
+            list.append(bundleId)
+            AppSettings.shared.swiftQuitExcludedApps = list
+        }
+    }
+    
+    public func removeExcludedApp(bundleId: String) {
+        var list = AppSettings.shared.swiftQuitExcludedApps
+        list.removeAll { $0 == bundleId }
+        AppSettings.shared.swiftQuitExcludedApps = list
     }
     
     @objc private func handleAppDeactivated(_ notification: Notification) {
@@ -99,12 +113,11 @@ public final class SwiftQuitEngine {
         checkAndScheduleQuitIfNeeded(app)
     }
     
-    private func isExcluded(bundleID: String, localizedName: String) -> Bool {
+    public func isExcluded(bundleID: String, localizedName: String) -> Bool {
         if systemExcludedBundleIDs.contains(bundleID) {
             return true
         }
         
-        // Check wildcard / prefix exclusions
         let lowerID = bundleID.lowercased()
         let lowerName = localizedName.lowercased()
         
@@ -128,7 +141,7 @@ public final class SwiftQuitEngine {
         return false
     }
     
-    private func hasActiveWindows(pid: pid_t) -> Bool {
+    public func hasActiveWindows(pid: pid_t) -> Bool {
         // 1. CoreGraphics Window List Verification (handles Metal, OpenGL, Games, Electron)
         if let windowList = CGWindowListCopyWindowInfo([.optionAll], kCGNullWindowID) as? [[String: Any]] {
             for info in windowList {
@@ -195,8 +208,7 @@ public final class SwiftQuitEngine {
             return
         }
         
-        // Grace period delay (minimum 2.0s) so dialog transitions don't kill the app
-        let delaySeconds = max(2.0, Double(AppSettings.shared.swiftQuitDelaySeconds))
+        let delaySeconds = max(0.5, Double(AppSettings.shared.swiftQuitDelaySeconds))
         
         // Cancel existing pending task for this PID if any
         pendingTerminationTasks[pid]?.cancel()
@@ -214,7 +226,7 @@ public final class SwiftQuitEngine {
                     return
                 }
                 
-                print("[WinMac AutoQuit] Gracefully closing app with 0 open windows: \(name) (\(bundleID))")
+                print("[WinMac SwiftQuit] Auto-terminating closed application: \(name) (\(bundleID))")
                 app.terminate()
             }
         }

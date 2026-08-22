@@ -37,7 +37,8 @@ public final class AltTabState: ObservableObject {
         let scanned = WindowEngine.shared.getWindows()
         self.windows = scanned
         self.searchText = ""
-        self.selectedIndex = scanned.count > 1 ? 1 : 0
+        // Index 0 = currently focused window; the caller advances with selectNext()
+        self.selectedIndex = 0
     }
     
     public func selectNext() {

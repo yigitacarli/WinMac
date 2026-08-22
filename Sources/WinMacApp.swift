@@ -7,11 +7,16 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
     private var cancellables = Set<AnyCancellable>()
     
+    public static var appVersion: String {
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
+        return (version?.isEmpty == false) ? version! : "1.2"
+    }
+    
     public func applicationDidFinishLaunching(_ notification: Notification) {
         print("[WinMac] Application launching...")
         
         // Ensure regular Dock application
-        NSApp.setActivationPolicy(.regular)
+        NSApp.setActivationPolicy(AppSettings.shared.showInDock ? .regular : .accessory)
         
         // Set App Icon explicitly on Dock
         if let iconPath = Bundle.main.path(forResource: "AppIcon", ofType: "icns"),
@@ -34,9 +39,11 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
             }
             .store(in: &cancellables)
         
-        // Always present settings window when user opens the app
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-            SettingsWindowController.shared.show()
+        // Only present settings automatically when accessibility permission is missing
+        if !PermissionsManager.shared.hasAccessibilityPermission {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                SettingsWindowController.shared.show()
+            }
         }
         
         print("[WinMac] Ready.")
@@ -51,7 +58,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         
         if let button = statusItem?.button {
-            button.image = NSImage(systemSymbolName: "macwindow.on.rectangle", accessibilityDescription: "WinMac")
+            button.image = NSImage(systemSymbolName: "square.grid.2x2", accessibilityDescription: "WinMac")
             button.imagePosition = .imageLeft
         }
         
@@ -61,7 +68,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
     private func updateStatusMenu() {
         let menu = NSMenu()
         
-        let titleItem = NSMenuItem(title: "WinMac — macOS Toolkit", action: nil, keyEquivalent: "")
+        let titleItem = NSMenuItem(title: "WinMac v\(Self.appVersion)", action: nil, keyEquivalent: "")
         titleItem.isEnabled = false
         menu.addItem(titleItem)
         menu.addItem(NSMenuItem.separator())
@@ -77,40 +84,40 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
             menu.addItem(NSMenuItem.separator())
         }
         
+        let rectItem = NSMenuItem(
+            title: "Pencere Yaslama Kısayolları: \(AppSettings.shared.snapShortcutsEnabled ? "Açık" : "Kapalı")",
+            action: #selector(toggleSnap),
+            keyEquivalent: ""
+        )
+        rectItem.target = self
+        menu.addItem(rectItem)
+        
+        let mouseItem = NSMenuItem(
+            title: "Fare Tekerleğini Ters Çevir: \(AppSettings.shared.invertMouseWheel ? "Açık" : "Kapalı")",
+            action: #selector(toggleMouseScroll),
+            keyEquivalent: ""
+        )
+        mouseItem.target = self
+        menu.addItem(mouseItem)
+        
+        let quitItem = NSMenuItem(
+            title: "Otomatik Uygulama Çıkışı: \(AppSettings.shared.swiftQuitEnabled ? "Açık" : "Kapalı")",
+            action: #selector(toggleSwiftQuit),
+            keyEquivalent: ""
+        )
+        quitItem.target = self
+        menu.addItem(quitItem)
+        
         let altTabItem = NSMenuItem(
-            title: "Pencere Değiştirici: \(AppSettings.shared.altTabEnabled ? "Açık" : "Kapalı")",
+            title: "Pencere Değiştirici (⌥Tab): \(AppSettings.shared.altTabEnabled ? "Açık" : "Kapalı")",
             action: #selector(toggleAltTab),
             keyEquivalent: ""
         )
         altTabItem.target = self
         menu.addItem(altTabItem)
         
-        let snapItem = NSMenuItem(
-            title: "Pencere Yaslama: \(AppSettings.shared.snapShortcutsEnabled ? "Açık" : "Kapalı")",
-            action: #selector(toggleSnap),
-            keyEquivalent: ""
-        )
-        snapItem.target = self
-        menu.addItem(snapItem)
-        
-        let quitEngineItem = NSMenuItem(
-            title: "Otomatik Çıkış (X İle Kapat): \(AppSettings.shared.swiftQuitEnabled ? "Açık" : "Kapalı")",
-            action: #selector(toggleSwiftQuit),
-            keyEquivalent: ""
-        )
-        quitEngineItem.target = self
-        menu.addItem(quitEngineItem)
-        
-        let mouseScrollItem = NSMenuItem(
-            title: "Standart Fare Tekerleği: \(AppSettings.shared.invertMouseWheel ? "Açık" : "Kapalı")",
-            action: #selector(toggleMouseScroll),
-            keyEquivalent: ""
-        )
-        mouseScrollItem.target = self
-        menu.addItem(mouseScrollItem)
-        
         let ctrlCmdItem = NSMenuItem(
-            title: "Klavye Kısayolları (Ctrl->Cmd): \(AppSettings.shared.ctrlToCmdRemapEnabled ? "Açık" : "Kapalı")",
+            title: "Ctrl ➔ Cmd Kısayolları: \(AppSettings.shared.ctrlToCmdRemapEnabled ? "Açık" : "Kapalı")",
             action: #selector(toggleCtrlCmd),
             keyEquivalent: ""
         )
@@ -118,7 +125,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(ctrlCmdItem)
         
         let clipItem = NSMenuItem(
-            title: "Pano Geçmişi (Option + V): \(AppSettings.shared.clipboardHistoryEnabled ? "Açık" : "Kapalı")",
+            title: "Pano Geçmişi (⌥V): \(AppSettings.shared.clipboardHistoryEnabled ? "Açık" : "Kapalı")",
             action: #selector(toggleClipboard),
             keyEquivalent: ""
         )
@@ -128,7 +135,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(NSMenuItem.separator())
         
         let settingsItem = NSMenuItem(
-            title: "Ayarlar Penceresini Aç...",
+            title: "WinMac Ayarlarını Aç...",
             action: #selector(openSettings),
             keyEquivalent: ","
         )
@@ -137,19 +144,19 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         
         menu.addItem(NSMenuItem.separator())
         
-        let quitItem = NSMenuItem(
+        let exitItem = NSMenuItem(
             title: "WinMac'ten Çık",
             action: #selector(quitApp),
             keyEquivalent: "q"
         )
-        quitItem.target = self
-        menu.addItem(quitItem)
+        exitItem.target = self
+        menu.addItem(exitItem)
         
         statusItem?.menu = menu
     }
     
-    @objc private func toggleAltTab() {
-        AppSettings.shared.altTabEnabled.toggle()
+    @objc private func toggleSnap() {
+        AppSettings.shared.snapShortcutsEnabled.toggle()
         updateStatusMenu()
     }
     
@@ -158,13 +165,13 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         updateStatusMenu()
     }
     
-    @objc private func toggleSnap() {
-        AppSettings.shared.snapShortcutsEnabled.toggle()
+    @objc private func toggleSwiftQuit() {
+        AppSettings.shared.swiftQuitEnabled.toggle()
         updateStatusMenu()
     }
     
-    @objc private func toggleSwiftQuit() {
-        AppSettings.shared.swiftQuitEnabled.toggle()
+    @objc private func toggleAltTab() {
+        AppSettings.shared.altTabEnabled.toggle()
         updateStatusMenu()
     }
     

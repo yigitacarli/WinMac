@@ -8,6 +8,7 @@ public enum SnapAction: Sendable {
     case topHalf
     case bottomHalf
     case maximize
+    case almostMaximize
     case topLeftQuarter
     case topRightQuarter
     case bottomLeftQuarter
@@ -85,7 +86,7 @@ public final class SnapEngine: @unchecked Sendable {
             if let pos = win.getPosition() {
                 self.trackedWindow = win
                 self.initialWindowOrigin = pos
-                self.isDraggingWindow = false // Will only become true if position physically changes
+                self.isDraggingWindow = false
                 return
             }
         }
@@ -112,7 +113,6 @@ public final class SnapEngine: @unchecked Sendable {
             return
         }
         
-        // Exact Rectangle check: Has the window's physical position on screen actually changed?
         guard let currentPos = win.getPosition() else {
             resetDragState()
             SnapOverlayController.shared.hidePreview()
@@ -121,7 +121,6 @@ public final class SnapEngine: @unchecked Sendable {
         
         let distanceMoved = hypot(currentPos.x - initialPos.x, currentPos.y - initialPos.y)
         if distanceMoved < 15.0 {
-            // Window is static (e.g. user clicking inside window, in a game, drawing, clicking buttons)
             if currentDragSnapTarget != nil {
                 currentDragSnapTarget = nil
                 SnapOverlayController.shared.hidePreview()
@@ -129,7 +128,6 @@ public final class SnapEngine: @unchecked Sendable {
             return
         }
         
-        // Window is genuinely being dragged by its titlebar across the desktop!
         self.isDraggingWindow = true
         
         let cursor = NSPoint(x: point.x, y: point.y)
@@ -339,6 +337,7 @@ public final class SnapEngine: @unchecked Sendable {
         
         let visibleFrame = screen.visibleFrame
         let gaps = CGFloat(UserDefaults.standard.double(forKey: "snapWindowGaps"))
+        let almostPad = CGFloat(UserDefaults.standard.double(forKey: "almostMaximizePadding"))
         
         // Multi-display navigation
         if action == .nextDisplay || action == .previousDisplay {
@@ -346,14 +345,14 @@ public final class SnapEngine: @unchecked Sendable {
             if allScreens.count > 1, let curIdx = allScreens.firstIndex(of: screen) {
                 let nextIdx = (action == .nextDisplay) ? (curIdx + 1) % allScreens.count : (curIdx - 1 + allScreens.count) % allScreens.count
                 let targetScreen = allScreens[nextIdx]
-                let targetRect = WindowCalculation.calculateRect(for: .maximize, visibleFrame: targetScreen.visibleFrame, gaps: gaps)
+                let targetRect = WindowCalculation.calculateRect(for: .maximize, visibleFrame: targetScreen.visibleFrame, gaps: gaps, almostMaximizePadding: almostPad)
                 let axY = primaryMaxY - targetRect.maxY
                 window.setFrame(position: CGPoint(x: targetRect.minX, y: axY), size: CGSize(width: targetRect.width, height: targetRect.height), appElement: app)
                 return
             }
         }
         
-        let targetRect = WindowCalculation.calculateRect(for: action, visibleFrame: visibleFrame, gaps: gaps)
+        let targetRect = WindowCalculation.calculateRect(for: action, visibleFrame: visibleFrame, gaps: gaps, almostMaximizePadding: almostPad)
         let axY = primaryMaxY - targetRect.maxY
         let origin = CGPoint(x: targetRect.minX, y: axY)
         let size = CGSize(width: targetRect.width, height: targetRect.height)

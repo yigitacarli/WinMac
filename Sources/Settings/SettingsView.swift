@@ -1,863 +1,471 @@
 import SwiftUI
 import AppKit
 
-// MARK: - Navigation Tabs
+// MARK: - Sidebar Sections
 
-public enum SettingsTab: String, CaseIterable, Identifiable {
-    case rectangle = "rectangle"
-    case linearMouse = "linearMouse"
-    case swiftQuit = "swiftQuit"
-    case altTab = "altTab"
-    case windowsShortcuts = "windowsShortcuts"
-    case about = "about"
-    
+public enum SettingsPane: String, CaseIterable, Identifiable, Hashable {
+    case general
+    case windowManagement
+    case mouseAndScroll
+    case appSwitcher
+    case keyboardShortcuts
+    case autoQuit
+
     public var id: String { rawValue }
-    
+
     public var title: String {
         switch self {
-        case .rectangle: return "Rectangle Pro"
-        case .linearMouse: return "Linear Mouse"
-        case .swiftQuit: return "SwiftQuit"
-        case .altTab: return "AltTab"
-        case .windowsShortcuts: return "Windows Kısayolları"
-        case .about: return "Hakkında & İzinler"
+        case .general: return "Genel"
+        case .windowManagement: return "Pencere Yönetimi"
+        case .mouseAndScroll: return "Fare ve Kaydırma"
+        case .appSwitcher: return "Pencere Değiştirici"
+        case .keyboardShortcuts: return "Klavye Kısayolları"
+        case .autoQuit: return "Otomatik Çıkış"
         }
     }
-    
+
     public var icon: String {
         switch self {
-        case .rectangle: return "rectangle.split.2x1.fill"
-        case .linearMouse: return "cursorarrow.rays"
-        case .swiftQuit: return "xmark.app.fill"
-        case .altTab: return "macwindow.on.rectangle"
-        case .windowsShortcuts: return "keyboard.fill"
-        case .about: return "info.circle.fill"
-        }
-    }
-    
-    public var tintColor: Color {
-        switch self {
-        case .rectangle: return .blue
-        case .linearMouse: return .teal
-        case .swiftQuit: return .red
-        case .altTab: return .indigo
-        case .windowsShortcuts: return .orange
-        case .about: return .purple
+        case .general: return "gearshape"
+        case .windowManagement: return "rectangle.split.2x1"
+        case .mouseAndScroll: return "computermouse"
+        case .appSwitcher: return "square.stack.3d.up"
+        case .keyboardShortcuts: return "command.square"
+        case .autoQuit: return "power.dotted"
         }
     }
 }
 
-// MARK: - Main Settings View
+// MARK: - Root View
 
 public struct SettingsView: View {
     @StateObject private var settings = AppSettings.shared
     @StateObject private var permissions = PermissionsManager.shared
-    @State private var selectedTab: SettingsTab = .rectangle
-    
+    @State private var selectedPane: SettingsPane = .general
+
     public init() {}
-    
+
     public var body: some View {
-        HStack(spacing: 0) {
-            // MARK: - Sidebar Navigation
-            VStack(alignment: .leading, spacing: 6) {
-                // Header Brand
-                HStack(spacing: 9) {
-                    Image(systemName: "square.grid.2x2.fill")
-                        .font(.system(size: 16, weight: .bold))
-                        .foregroundStyle(LinearGradient(colors: [.blue, .purple], startPoint: .topLeading, endPoint: .bottomTrailing))
-                    
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text("WinMac")
-                            .font(.system(size: 13.5, weight: .bold))
-                        Text("v1.1 Native Suite")
-                            .font(.system(size: 10, weight: .medium, design: .monospaced))
-                            .foregroundColor(.secondary)
-                    }
+        NavigationSplitView {
+            List(selection: $selectedPane) {
+                ForEach(SettingsPane.allCases) { pane in
+                    Label(pane.title, systemImage: pane.icon)
+                        .tag(pane)
                 }
-                .padding(.horizontal, 14)
-                .padding(.top, 16)
-                .padding(.bottom, 10)
-                
-                Divider()
-                    .opacity(0.4)
-                    .padding(.horizontal, 10)
-                    .padding(.bottom, 6)
-                
-                // Tab Items List
-                VStack(spacing: 3) {
-                    ForEach(SettingsTab.allCases) { tab in
-                        SidebarButton(
-                            tab: tab,
-                            isSelected: selectedTab == tab,
-                            action: { selectedTab = tab }
-                        )
-                    }
-                }
-                .padding(.horizontal, 8)
-                
-                Spacer()
-                
-                // Status pill at bottom
+            }
+            .listStyle(.sidebar)
+            .navigationSplitViewColumnWidth(min: 170, ideal: 185, max: 220)
+            .safeAreaInset(edge: .bottom) {
                 HStack(spacing: 6) {
                     Circle()
-                        .fill(permissions.hasAccessibilityPermission ? Color.green : Color.red)
+                        .fill(permissions.hasAccessibilityPermission ? Color.green : Color.orange)
                         .frame(width: 7, height: 7)
-                    Text(permissions.hasAccessibilityPermission ? "Erişilebilirlik Aktif" : "İzin Bekleniyor")
-                        .font(.system(size: 10.5, weight: .medium))
-                        .foregroundColor(.secondary)
+                    Text(permissions.hasAccessibilityPermission ? "İzinler tamam" : "Erişilebilirlik izni gerekli")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
-                .padding(.horizontal, 14)
-                .padding(.bottom, 14)
+                .padding(.leading, 18)
+                .padding(.bottom, 10)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .frame(width: 200)
-            .background(Color(NSColor.windowBackgroundColor).opacity(0.6))
-            
-            Divider()
-                .opacity(0.5)
-            
-            // MARK: - Main Content Area
-            ScrollView(.vertical, showsIndicators: true) {
-                VStack(alignment: .leading, spacing: 16) {
-                    switch selectedTab {
-                    case .rectangle:
-                        RectangleProSettingsContent(settings: settings)
-                    case .linearMouse:
-                        LinearMouseSettingsContent(settings: settings)
-                    case .swiftQuit:
-                        SwiftQuitSettingsContent(settings: settings)
-                    case .altTab:
-                        AltTabSettingsContent(settings: settings)
-                    case .windowsShortcuts:
-                        WindowsShortcutsSettingsContent(settings: settings)
-                    case .about:
-                        AboutSettingsContent(settings: settings, permissions: permissions)
-                    }
-                }
-                .padding(22)
-            }
-            .background(Color(NSColor.controlBackgroundColor).opacity(0.35))
-        }
-        .frame(width: 760, height: 550)
-    }
-}
-
-// MARK: - Sidebar Button Component
-
-private struct SidebarButton: View {
-    let tab: SettingsTab
-    let isSelected: Bool
-    let action: () -> Void
-    
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 9) {
-                Image(systemName: tab.icon)
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(isSelected ? .white : tab.tintColor)
-                    .frame(width: 18)
-                
-                Text(tab.title)
-                    .font(.system(size: 12.5, weight: isSelected ? .semibold : .regular))
-                    .foregroundColor(isSelected ? .white : .primary)
-                
-                Spacer()
-            }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 7)
-            .background(
-                RoundedRectangle(cornerRadius: 7, style: .continuous)
-                    .fill(isSelected ? Color.accentColor : Color.clear)
-            )
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-    }
-}
-
-// MARK: - Section Header & Group Box
-
-private struct SectionHeader: View {
-    let title: String
-    let subtitle: String
-    let badge: String?
-    
-    init(title: String, subtitle: String, badge: String? = nil) {
-        self.title = title
-        self.subtitle = subtitle
-        self.badge = badge
-    }
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 8) {
-                Text(title)
-                    .font(.system(size: 17, weight: .bold))
-                
-                if let badge = badge {
-                    Text(badge)
-                        .font(.system(size: 10, weight: .bold))
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(Capsule().fill(Color.accentColor.opacity(0.15)))
-                        .foregroundColor(.accentColor)
+        } detail: {
+            Group {
+                switch selectedPane {
+                case .general:
+                    GeneralPane(settings: settings, permissions: permissions)
+                case .windowManagement:
+                    WindowManagementPane(settings: settings)
+                case .mouseAndScroll:
+                    MouseScrollPane(settings: settings)
+                case .appSwitcher:
+                    AppSwitcherPane(settings: settings)
+                case .keyboardShortcuts:
+                    KeyboardShortcutsPane(settings: settings)
+                case .autoQuit:
+                    AutoQuitPane(settings: settings)
                 }
             }
-            
-            Text(subtitle)
-                .font(.system(size: 12))
-                .foregroundColor(.secondary)
+            .formStyle(.grouped)
+            .navigationTitle(selectedPane.title)
         }
-        .padding(.bottom, 4)
+        .frame(width: 720, height: 500)
     }
 }
 
-private struct SettingsCard<Content: View>: View {
-    let title: String?
-    @ViewBuilder let content: () -> Content
-    
-    init(title: String? = nil, @ViewBuilder content: @escaping () -> Content) {
-        self.title = title
-        self.content = content
-    }
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            if let title = title {
-                Text(title.uppercased())
-                    .font(.system(size: 10.5, weight: .bold))
-                    .foregroundColor(.secondary)
-                    .padding(.leading, 2)
-            }
-            
-            VStack(spacing: 0) {
-                content()
-            }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 10)
-            .background(
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(Color(NSColor.controlBackgroundColor))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .stroke(Color(NSColor.separatorColor).opacity(0.35), lineWidth: 0.5)
-                    )
-            )
-        }
-    }
-}
+// MARK: - Shared Rows
 
-private struct SettingRow<Trailing: View>: View {
-    let icon: String
-    let iconColor: Color
+private struct ToggleRow: View {
     let title: String
     let subtitle: String?
-    @ViewBuilder let trailing: () -> Trailing
-    
-    init(
-        icon: String,
-        iconColor: Color = .blue,
-        title: String,
-        subtitle: String? = nil,
-        @ViewBuilder trailing: @escaping () -> Trailing
-    ) {
-        self.icon = icon
-        self.iconColor = iconColor
+    @Binding var isOn: Bool
+
+    init(_ title: String, subtitle: String? = nil, isOn: Binding<Bool>) {
         self.title = title
         self.subtitle = subtitle
-        self.trailing = trailing
+        self._isOn = isOn
     }
-    
+
     var body: some View {
-        HStack(spacing: 12) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .fill(iconColor.opacity(0.12))
-                    .frame(width: 28, height: 28)
-                Image(systemName: icon)
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(iconColor)
-            }
-            
+        LabeledContent {
+            Toggle("", isOn: $isOn).labelsHidden().toggleStyle(.switch)
+        } label: {
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
-                    .font(.system(size: 13, weight: .medium))
                 if let subtitle = subtitle {
                     Text(subtitle)
-                        .font(.system(size: 11.5))
-                        .foregroundColor(.secondary)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
-            }
-            
-            Spacer()
-            
-            trailing()
-        }
-        .padding(.vertical, 5)
-    }
-}
-
-private struct Keycap: View {
-    let text: String
-    
-    var body: some View {
-        Text(text)
-            .font(.system(size: 11, weight: .bold, design: .monospaced))
-            .foregroundColor(.primary)
-            .padding(.horizontal, 7)
-            .padding(.vertical, 3)
-            .background(
-                RoundedRectangle(cornerRadius: 4, style: .continuous)
-                    .fill(Color(NSColor.windowBackgroundColor))
-                    .shadow(color: Color.black.opacity(0.12), radius: 1, x: 0, y: 1)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 4, style: .continuous)
-                            .stroke(Color.primary.opacity(0.15), lineWidth: 0.5)
-                    )
-            )
-    }
-}
-
-// MARK: - 1. Rectangle Pro Tab
-
-private struct RectangleProSettingsContent: View {
-    @ObservedObject var settings: AppSettings
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            SectionHeader(
-                title: "Rectangle Pro",
-                subtitle: "Ekran kenarlarına sürükleyerek veya kısayollarla pencereleri anında hizalayın.",
-                badge: "Orijinal Çekirdek"
-            )
-            
-            SettingsCard(title: "Sürükle-Yasla (Aero Snap)") {
-                SettingRow(
-                    icon: "cursorarrow.motionlines",
-                    iconColor: .blue,
-                    title: "Sürükle-Yasla Önizlemesini Etkinleştir",
-                    subtitle: "Pencereleri ekran kenarlarına veya köşelerine sürüklediğinizde yarı saydam önizleme gösterir."
-                ) {
-                    Toggle("", isOn: $settings.dragToSnapEnabled)
-                        .labelsHidden()
-                        .toggleStyle(.switch)
-                }
-                
-                Divider().opacity(0.4).padding(.vertical, 6)
-                
-                VStack(alignment: .leading, spacing: 6) {
-                    HStack {
-                        Text("Pencereler Arası Boşluk (Gaps)")
-                            .font(.system(size: 13, weight: .medium))
-                        Spacer()
-                        Text("\(Int(settings.snapWindowGaps)) px")
-                            .font(.system(size: 11.5, weight: .bold, design: .monospaced))
-                            .foregroundColor(.secondary)
-                    }
-                    Slider(value: $settings.snapWindowGaps, in: 0...30, step: 2)
-                }
-                .padding(.vertical, 4)
-            }
-            
-            SettingsCard(title: "Klavye Kısayolları & Döngü") {
-                SettingRow(
-                    icon: "keyboard",
-                    iconColor: .indigo,
-                    title: "Kısayol ile Hizalamayı Etkinleştir",
-                    subtitle: "Option + Control tuş kombinasyonları ile pencereleri anında yerleştirir."
-                ) {
-                    Toggle("", isOn: $settings.snapShortcutsEnabled)
-                        .labelsHidden()
-                        .toggleStyle(.switch)
-                }
-                
-                Divider().opacity(0.4).padding(.vertical, 6)
-                
-                SettingRow(
-                    icon: "arrow.triangle.2.circlepath",
-                    iconColor: .purple,
-                    title: "Tekrarlanan Kısayollarda Boyut Döngüsü",
-                    subtitle: "Aynı kısayola ard arda basıldığında pencereyi 1/2 ➔ 2/3 ➔ 1/3 oranlarında döngüye sokar."
-                ) {
-                    Toggle("", isOn: $settings.cycleRepeatedShortcuts)
-                        .labelsHidden()
-                        .toggleStyle(.switch)
-                }
-                
-                Divider().opacity(0.4).padding(.vertical, 6)
-                
-                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
-                    ShortcutItem(keys: "⌥ ⌃ ← / →", desc: "Sol / Sağ Yarı (Döngülü)")
-                    ShortcutItem(keys: "⌥ ⌃ ↑", desc: "Tam Ekran")
-                    ShortcutItem(keys: "⌥ ⌃ ↓", desc: "Alt Yarı Ekran")
-                    ShortcutItem(keys: "⌥ ⌃ Return", desc: "Tam Ekran")
-                    ShortcutItem(keys: "⌥ ⌃ C", desc: "Merkeze Al (Center)")
-                    ShortcutItem(keys: "⌥ ⌃ U / I", desc: "Sol Üst / Sağ Üst Çeyrek")
-                    ShortcutItem(keys: "⌥ ⌃ J / K", desc: "Sol Alt / Sağ Alt Çeyrek")
-                    ShortcutItem(keys: "⌥ ⌃ ⌘ Oklar", desc: "Diğer Ekrana Taşı")
-                }
-                .padding(.top, 4)
             }
         }
     }
 }
 
-private struct ShortcutItem: View {
+private struct PickerRow<Value: Hashable>: View {
+    let title: String
+    @Binding var selection: Value
+    let options: [Value]
+    let label: (Value) -> String
+
+    init(_ title: String, selection: Binding<Value>, options: [Value], label: @escaping (Value) -> String) {
+        self.title = title
+        self._selection = selection
+        self.options = options
+        self.label = label
+    }
+
+    var body: some View {
+        Picker(title, selection: $selection) {
+            ForEach(options, id: \.self) { option in
+                Text(label(option)).tag(option)
+            }
+        }
+    }
+}
+
+private struct ShortcutRow: View {
+    let action: String
     let keys: String
-    let desc: String
-    
+
     var body: some View {
-        HStack(spacing: 6) {
-            Keycap(text: keys)
-            Text(desc)
-                .font(.system(size: 11.5))
-                .foregroundColor(.secondary)
-                .lineLimit(1)
-            Spacer()
+        LabeledContent(action) {
+            Text(keys)
+                .font(.system(size: 11, weight: .medium, design: .monospaced))
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2)
+                .background(Color(nsColor: .quaternaryLabelColor).opacity(0.35))
+                .clipShape(RoundedRectangle(cornerRadius: 4))
         }
     }
 }
 
-// MARK: - 2. Linear Mouse Tab
+private struct SliderRow: View {
+    let title: String
+    let value: Binding<Double>
+    let range: ClosedRange<Double>
+    let step: Double
+    let format: String
 
-private struct LinearMouseSettingsContent: View {
-    @ObservedObject var settings: AppSettings
-    
+    init(_ title: String, value: Binding<Double>, range: ClosedRange<Double>, step: Double, format: String) {
+        self.title = title
+        self.value = value
+        self.range = range
+        self.step = step
+        self.format = format
+    }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            SectionHeader(
-                title: "Linear Mouse",
-                subtitle: "Doğrusal ivme, donanım DPI hassasiyeti ve tekerlek yönü denetimi.",
-                badge: "IOHID Sürücüsü"
-            )
-            
-            SettingsCard(title: "İmleç İvmesi & Hız") {
-                SettingRow(
-                    icon: "speedometer",
-                    iconColor: .teal,
-                    title: "Doğrusal Fare İvmesi (1:1 Hassasiyet)",
-                    subtitle: "macOS ivmelenme eğrisini sıfırlayarak sabit 1:1 net ve kesintisiz Windows tarzı fare kontrolü sağlar."
-                ) {
-                    Toggle("", isOn: $settings.disableMouseAcceleration)
-                        .labelsHidden()
-                        .toggleStyle(.switch)
-                }
-                
-                Divider().opacity(0.4).padding(.vertical, 6)
-                
-                VStack(alignment: .leading, spacing: 6) {
-                    HStack {
-                        Text("Fare İmleç Hassasiyeti / Hızı (DPI)")
-                            .font(.system(size: 13, weight: .medium))
-                        Spacer()
-                        Text(String(format: "%.1fx", settings.mousePointerSensitivity))
-                            .font(.system(size: 11.5, weight: .bold, design: .monospaced))
-                            .foregroundColor(.secondary)
-                    }
-                    Slider(value: $settings.mousePointerSensitivity, in: 0.5...3.0, step: 0.1)
-                }
-                .padding(.vertical, 4)
-            }
-            
-            SettingsCard(title: "Tekerlek Kaydırma Yönü (Scroll Wheel)") {
-                SettingRow(
-                    icon: "computermouse",
-                    iconColor: .blue,
-                    title: "Dikey Kaydırma Yönünü Tersine Çevir",
-                    subtitle: "Fiziksel fare tekerleğinin yönünü tersine çevirir. Trackpad doğal kaydırmada kalır ve jestlere dokunulmaz."
-                ) {
-                    Toggle("", isOn: $settings.invertMouseWheel)
-                        .labelsHidden()
-                        .toggleStyle(.switch)
-                }
-                
-                Divider().opacity(0.4).padding(.vertical, 6)
-                
-                SettingRow(
-                    icon: "arrow.left.and.right",
-                    iconColor: .purple,
-                    title: "Yatay Kaydırma Yönünü Tersine Çevir",
-                    subtitle: "Harici farelerin yatay tekerlek hareketini tersine çevirir."
-                ) {
-                    Toggle("", isOn: $settings.invertHorizontalScroll)
-                        .labelsHidden()
-                        .toggleStyle(.switch)
-                }
-                
-                Divider().opacity(0.4).padding(.vertical, 6)
-                
-                VStack(alignment: .leading, spacing: 6) {
-                    HStack {
-                        Text("Kaydırma Hızı Çarpanı")
-                            .font(.system(size: 13, weight: .medium))
-                        Spacer()
-                        Text(String(format: "%.2fx", settings.scrollSpeedMultiplier))
-                            .font(.system(size: 11.5, weight: .bold, design: .monospaced))
-                            .foregroundColor(.secondary)
-                    }
-                    Slider(value: $settings.scrollSpeedMultiplier, in: 0.5...4.0, step: 0.25)
-                }
-                .padding(.vertical, 4)
+        LabeledContent(title) {
+            HStack(spacing: 8) {
+                Slider(value: value, in: range, step: step)
+                    .frame(width: 150)
+                Text(String(format: format, value.wrappedValue))
+                    .font(.callout.monospacedDigit())
+                    .foregroundStyle(.secondary)
+                    .frame(width: 44, alignment: .trailing)
             }
         }
     }
 }
 
-// MARK: - 3. SwiftQuit Tab
+// MARK: - 1. Genel
 
-private struct SwiftQuitSettingsContent: View {
-    @ObservedObject var settings: AppSettings
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            SectionHeader(
-                title: "SwiftQuit",
-                subtitle: "Son pencere kapatıldığında uygulamayı arka planda açık bırakmaz, otomatik sonlandırır.",
-                badge: "Olay Odaklı"
-            )
-            
-            SettingsCard(title: "Otomatik Çıkış Denetimi") {
-                SettingRow(
-                    icon: "xmark.app.fill",
-                    iconColor: .red,
-                    title: "Pencere Kapanınca Otomatik Çıkış Yap",
-                    subtitle: "Bir uygulamanın son penceresini kırmızı 'X' ile kapattığınızda Dock'taki açık noktasını kaldırır ve uygulamayı kapatır."
-                ) {
-                    Toggle("", isOn: $settings.swiftQuitEnabled)
-                        .labelsHidden()
-                        .toggleStyle(.switch)
-                }
-                
-                Divider().opacity(0.4).padding(.vertical, 6)
-                
-                VStack(alignment: .leading, spacing: 6) {
-                    HStack {
-                        Text("Kapanma Gecikmesi Süresi")
-                            .font(.system(size: 13, weight: .medium))
-                        Spacer()
-                        Text("\(settings.swiftQuitDelaySeconds) saniye")
-                            .font(.system(size: 11.5, weight: .bold, design: .monospaced))
-                            .foregroundColor(.secondary)
-                    }
-                    Slider(value: Binding(
-                        get: { Double(settings.swiftQuitDelaySeconds) },
-                        set: { settings.swiftQuitDelaySeconds = Int($0) }
-                    ), in: 0...10, step: 1)
-                }
-                .padding(.vertical, 4)
-            }
-            
-            SettingsCard(title: "Dokunulmazlık & Korumalı Uygulamalar") {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Aşağıdaki uygulama türleri asla otomatik kapatılmaz:")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(.secondary)
-                    
-                    HStack(spacing: 8) {
-                        ProtectedBadge(icon: "gamecontroller.fill", text: "Oyunlar (LoL, Steam, Riot)")
-                        ProtectedBadge(icon: "chevron.left.forwardslash.chevron.right", text: "IDE'ler (Antigravity, VSCode)")
-                    }
-                    
-                    HStack(spacing: 8) {
-                        ProtectedBadge(icon: "terminal.fill", text: "Terminaller")
-                        ProtectedBadge(icon: "music.note", text: "Müzik & İletişim")
-                    }
-                    
-                    Text("💡 Not: Sarı butonla simge durumuna küçültülen (Minimize) ve ⌘ Cmd + H ile gizlenen pencereler de asla kapatılmaz.")
-                        .font(.system(size: 11))
-                        .foregroundColor(.secondary)
-                        .padding(.top, 4)
-                }
-                .padding(.vertical, 4)
-            }
-        }
-    }
-}
-
-private struct ProtectedBadge: View {
-    let icon: String
-    let text: String
-    
-    var body: some View {
-        HStack(spacing: 6) {
-            Image(systemName: icon)
-                .font(.system(size: 11))
-                .foregroundColor(.accentColor)
-            Text(text)
-                .font(.system(size: 11.5, weight: .medium))
-        }
-        .padding(.horizontal, 9)
-        .padding(.vertical, 5)
-        .background(
-            RoundedRectangle(cornerRadius: 6, style: .continuous)
-                .fill(Color.accentColor.opacity(0.1))
-        )
-    }
-}
-
-// MARK: - 4. AltTab Tab
-
-private struct AltTabSettingsContent: View {
-    @ObservedObject var settings: AppSettings
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            SectionHeader(
-                title: "AltTab",
-                subtitle: "Windows tarzı zengin önizlemeli pencere değiştirici HUD arayüzü.",
-                badge: "Z-Order Sıralaması"
-            )
-            
-            SettingsCard(title: "Genel") {
-                SettingRow(
-                    icon: "macwindow.on.rectangle",
-                    iconColor: .indigo,
-                    title: "AltTab Değiştiriciyi Etkinleştir",
-                    subtitle: "Klavyeden hızlı pencere geçiş HUD arayüzünü aktif eder."
-                ) {
-                    Toggle("", isOn: $settings.altTabEnabled)
-                        .labelsHidden()
-                        .toggleStyle(.switch)
-                }
-                
-                Divider().opacity(0.4).padding(.vertical, 6)
-                
-                SettingRow(
-                    icon: "command",
-                    iconColor: .blue,
-                    title: "Tetikleyici Kısayol",
-                    subtitle: "Arayüzü açmak için kullanılacak tuş kombinasyonu."
-                ) {
-                    Picker("", selection: $settings.switcherShortcut) {
-                        ForEach(AltTabShortcut.allCases) { shortcut in
-                            Text(shortcut.title).tag(shortcut)
-                        }
-                    }
-                    .labelsHidden()
-                    .pickerStyle(.menu)
-                    .frame(width: 170)
-                }
-                
-                Divider().opacity(0.4).padding(.vertical, 6)
-                
-                SettingRow(
-                    icon: "square.grid.2x2",
-                    iconColor: .purple,
-                    title: "Görünüm Stili",
-                    subtitle: "Pencerelerin switcher üzerinde nasıl listeleneceği."
-                ) {
-                    Picker("", selection: $settings.switcherStyle) {
-                        ForEach(SwitcherStyle.allCases) { style in
-                            Text(style.title).tag(style)
-                        }
-                    }
-                    .labelsHidden()
-                    .pickerStyle(.menu)
-                    .frame(width: 170)
-                }
-                
-                Divider().opacity(0.4).padding(.vertical, 6)
-                
-                SettingRow(
-                    icon: "display",
-                    iconColor: .teal,
-                    title: "Monitör Konumu",
-                    subtitle: "Pencere seçicinin hangi ekranda açılacağı."
-                ) {
-                    Picker("", selection: $settings.displayMode) {
-                        ForEach(SwitcherDisplayMode.allCases) { mode in
-                            Text(mode.title).tag(mode)
-                        }
-                    }
-                    .labelsHidden()
-                    .pickerStyle(.menu)
-                    .frame(width: 170)
-                }
-            }
-            
-            SettingsCard(title: "Klavye Gezinimi (HUD Açıkken)") {
-                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
-                    ShortcutItem(keys: "Tab / ⇧ Tab", desc: "Sonraki / Önceki Pencere")
-                    ShortcutItem(keys: "← / →", desc: "Ok Tuşlarıyla Gezin")
-                    ShortcutItem(keys: "W", desc: "Seçili Pencereyi Kapat")
-                    ShortcutItem(keys: "Q", desc: "Seçili Uygulamadan Çık")
-                    ShortcutItem(keys: "Return", desc: "Pencereye Odaklan")
-                    ShortcutItem(keys: "Esc", desc: "HUD İptal Et")
-                }
-                .padding(.vertical, 4)
-            }
-        }
-    }
-}
-
-// MARK: - 5. Windows Shortcuts Tab
-
-private struct WindowsShortcutsSettingsContent: View {
-    @ObservedObject var settings: AppSettings
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            SectionHeader(
-                title: "Windows Kısayolları & Pano",
-                subtitle: "Ctrl+C, Ctrl+V kas hafızası eşlemesi, Option+V pano geçmişi ve sistem tuşları.",
-                badge: "Kas Hafızası"
-            )
-            
-            SettingsCard(title: "Ctrl Tuş Eşlemesi (Ctrl ➔ Command)") {
-                SettingRow(
-                    icon: "keyboard.fill",
-                    iconColor: .orange,
-                    title: "Ctrl Tuşlarını Command Olarak Eşle",
-                    subtitle: "Ctrl+C, Ctrl+V, Ctrl+Z, Ctrl+Y, Ctrl+A, Ctrl+S kısayollarını macOS üzerinde aynen çalıştırır."
-                ) {
-                    Toggle("", isOn: $settings.ctrlToCmdRemapEnabled)
-                        .labelsHidden()
-                        .toggleStyle(.switch)
-                }
-                
-                Divider().opacity(0.4).padding(.vertical, 6)
-                
-                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
-                    ShortcutItem(keys: "⌃ C / ⌃ V", desc: "Kopyala / Yapıştır")
-                    ShortcutItem(keys: "⌃ X / ⌃ A", desc: "Kes / Tümünü Seç")
-                    ShortcutItem(keys: "⌃ Z / ⌃ Y", desc: "Geri Al / Yinele")
-                    ShortcutItem(keys: "⌃ S / ⌃ F", desc: "Kaydet / Bul")
-                }
-                .padding(.top, 4)
-            }
-            
-            SettingsCard(title: "Pano Geçmişi (Option + V)") {
-                SettingRow(
-                    icon: "doc.on.clipboard.fill",
-                    iconColor: .blue,
-                    title: "Pano Geçmişini Etkinleştir",
-                    subtitle: "⌥ Option + V ile kopyalanan metinleri listeleyin, arayın ve tek tıkla yapıştırın."
-                ) {
-                    Toggle("", isOn: $settings.clipboardHistoryEnabled)
-                        .labelsHidden()
-                        .toggleStyle(.switch)
-                }
-                
-                Divider().opacity(0.4).padding(.vertical, 6)
-                
-                SettingRow(
-                    icon: "list.number",
-                    iconColor: .secondary,
-                    title: "Maksimum Pano Kayıt Sayısı",
-                    subtitle: "Hafızada saklanacak geçmiş kopyalama sayısı."
-                ) {
-                    Picker("", selection: $settings.maxClipboardItems) {
-                        Text("25 Öğe").tag(25)
-                        Text("50 Öğe").tag(50)
-                        Text("100 Öğe").tag(100)
-                    }
-                    .labelsHidden()
-                    .pickerStyle(.menu)
-                    .frame(width: 120)
-                }
-            }
-            
-            SettingsCard(title: "Hızlı Sistem Kısayolları") {
-                SettingRow(
-                    icon: "lock.fill",
-                    iconColor: .gray,
-                    title: "Win + L (⌥ Option + ⌘ Command + L) ile Ekran Kilitle",
-                    subtitle: "Windows'taki Win+L gibi ekranı anında kilitler / uyku moduna alır."
-                ) {
-                    Toggle("", isOn: $settings.winLToLockEnabled)
-                        .labelsHidden()
-                        .toggleStyle(.switch)
-                }
-                
-                Divider().opacity(0.4).padding(.vertical, 6)
-                
-                SettingRow(
-                    icon: "gauge.with.needle.fill",
-                    iconColor: .green,
-                    title: "Ctrl + Shift + Esc ➔ Etkinlik Monitörü",
-                    subtitle: "Windows Görev Yöneticisi kısayoluyla macOS Etkinlik Monitörü'nü anında açar."
-                ) {
-                    Toggle("", isOn: $settings.ctrlShiftEscTaskManager)
-                        .labelsHidden()
-                        .toggleStyle(.switch)
-                }
-            }
-        }
-    }
-}
-
-// MARK: - 6. About & Permissions Tab
-
-private struct AboutSettingsContent: View {
+private struct GeneralPane: View {
     @ObservedObject var settings: AppSettings
     @ObservedObject var permissions: PermissionsManager
-    
+
+    private var appVersion: String {
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.2"
+    }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            SectionHeader(
-                title: "Hakkında & İzinler",
-                subtitle: "WinMac sürüm bilgileri, sistem erişilebilirlik izinleri ve genel ayarlar."
-            )
-            
-            SettingsCard(title: "Sistem İzinleri") {
-                HStack(spacing: 12) {
-                    ZStack {
-                        Circle()
-                            .fill(permissions.hasAccessibilityPermission ? Color.green.opacity(0.15) : Color.red.opacity(0.15))
-                            .frame(width: 34, height: 34)
-                        Image(systemName: permissions.hasAccessibilityPermission ? "checkmark.shield.fill" : "exclamationmark.shield.fill")
-                            .font(.system(size: 17))
-                            .foregroundColor(permissions.hasAccessibilityPermission ? .green : .red)
+        Form {
+            Section {
+                LabeledContent {
+                    Button(permissions.hasAccessibilityPermission ? "İzin verildi" : "Sistem Ayarlarını Aç") {
+                        permissions.openAccessibilitySettings()
                     }
-                    
+                    .disabled(permissions.hasAccessibilityPermission)
+                } label: {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(permissions.hasAccessibilityPermission ? "Erişilebilirlik İzni Aktif" : "Erişilebilirlik İzni Gerekli")
-                            .font(.system(size: 13.5, weight: .semibold))
-                        Text(permissions.hasAccessibilityPermission ? "Pencere yönetimi, fare ve kısayollar sorunsuz çalışıyor." : "Pencere yaslama ve fare denetimi için Sistem Ayarları'ndan izin vermeniz gerekir.")
-                            .font(.system(size: 11.5))
-                            .foregroundColor(.secondary)
-                    }
-                    
-                    Spacer()
-                    
-                    if !permissions.hasAccessibilityPermission {
-                        Button("İzni Aç") {
-                            permissions.openAccessibilitySettings()
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .controlSize(.small)
+                        Text("Erişilebilirlik İzni")
+                        Text("Klavye ve fare denetimi için gereklidir.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                     }
                 }
-                .padding(.vertical, 4)
+            } header: {
+                Text("İzinler")
             }
-            
-            SettingsCard(title: "Görünürlük & Başlangıç") {
-                SettingRow(
-                    icon: "dock.rectangle",
-                    iconColor: .purple,
-                    title: "Dock Çubuğunda Göster",
-                    subtitle: "WinMac simgesinin macOS Dock çubuğunda görünmesini sağlar."
-                ) {
-                    Toggle("", isOn: $settings.showInDock)
-                        .labelsHidden()
-                        .toggleStyle(.switch)
-                }
+
+            Section {
+                ToggleRow("Girişte Otomatik Başlat", isOn: $settings.launchAtLogin)
+                ToggleRow("Dock'ta Göster",
+                          subtitle: "Kapalıysa uygulama yalnızca menü çubuğunda çalışır.",
+                          isOn: $settings.showInDock)
+            } header: {
+                Text("Başlangıç")
             }
-            
-            SettingsCard(title: "Uygulama Bilgisi") {
-                HStack {
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text("WinMac v1.1")
-                            .font(.system(size: 13.5, weight: .bold))
-                        Text("Rectangle Pro, Linear Mouse, SwiftQuit, AltTab ve Windows Kısayollarını tek bir hafif yerel Swift uygulamasında birleştiren sistem aracı.")
-                            .font(.system(size: 11.5))
-                            .foregroundColor(.secondary)
-                    }
-                    Spacer()
-                    Link("GitHub", destination: URL(string: "https://github.com/yigitacarli/WinMac")!)
-                        .font(.system(size: 12, weight: .semibold))
+
+            Section {
+                LabeledContent("Sürüm") {
+                    Text(appVersion).foregroundStyle(.secondary)
                 }
-                .padding(.vertical, 4)
+                LabeledContent("Modüller") {
+                    Text("Pencere Yönetimi · Fare · Değiştirici · Kısayollar · Pano · Otomatik Çıkış")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            } header: {
+                Text("Hakkında")
+            } footer: {
+                Text("WinMac; açık kaynak Rectangle, LinearMouse, AltTab ve SwiftQuit projelerinden esinlenmiştir.")
             }
         }
+    }
+}
+
+// MARK: - 2. Pencere Yönetimi
+
+private struct WindowManagementPane: View {
+    @ObservedObject var settings: AppSettings
+
+    var body: some View {
+        Form {
+            Section {
+                ToggleRow("Klavye Kısayollarını Etkinleştir", isOn: $settings.snapShortcutsEnabled)
+                ToggleRow("Aynı Kısayolda Boyut Döngüsü",
+                          subtitle: "Tekrar basıldığında yarım → üçte iki → üçte bir döngüsü.",
+                          isOn: $settings.cycleRepeatedShortcuts)
+            } header: {
+                Text("Klavye ile Yaslama")
+            }
+
+            Section {
+                ToggleRow("Kenara Sürükleerek Yasla",
+                          subtitle: "Pencereyi ekran kenarına veya köşesine sürükleyin.",
+                          isOn: $settings.dragToSnapEnabled)
+                ToggleRow("Yaslama Önizlemesi", isOn: $settings.aeroSnapEnabled)
+            } header: {
+                Text("Fare ile Yaslama")
+            }
+
+            Section {
+                SliderRow("Pencere Aralığı", value: $settings.snapWindowGaps, range: 0...30, step: 2, format: "%.0f px")
+                SliderRow("Neredeyse Tam Ekran Boşluğu", value: $settings.almostMaximizePadding, range: 8...50, step: 2, format: "%.0f px")
+            } header: {
+                Text("Boşluklar")
+            } footer: {
+                Text("Boşluklar yaslanan pencerenin ekran kenarlarıyla arasında bırakılacak mesafeyi belirler.")
+            }
+
+            Section {
+                ShortcutRow(action: "Sol Yarı", keys: "⌃⌥←")
+                ShortcutRow(action: "Sağ Yarı", keys: "⌃⌥→")
+                ShortcutRow(action: "Üst Yarı", keys: "⌃⌥↑")
+                ShortcutRow(action: "Alt Yarı", keys: "⌃⌥↓")
+                ShortcutRow(action: "Tam Ekran", keys: "⌃⌥↩")
+                ShortcutRow(action: "Merkez", keys: "⌃⌥C")
+                ShortcutRow(action: "Dörtte Birler", keys: "⌃⌥U İ J K")
+                ShortcutRow(action: "Üçte Birler", keys: "⌃⌥D F G E T")
+                ShortcutRow(action: "Diğer Ekrana Taşı", keys: "⌃⌥⌘← →")
+            } header: {
+                Text("Kısayol Referansı")
+            }
+        }
+    }
+}
+
+// MARK: - 3. Fare ve Kaydırma
+
+private struct MouseScrollPane: View {
+    @ObservedObject var settings: AppSettings
+
+    var body: some View {
+        Form {
+            Section {
+                ToggleRow("Tekerleği Ters Çevir",
+                          subtitle: "Trackpad'i etkilemez; yalnızca harici fare tekerleği.",
+                          isOn: $settings.invertMouseWheel)
+                ToggleRow("Yatay Kaydırmayı Ters Çevir", isOn: $settings.invertHorizontalScroll)
+                ToggleRow("Shift + Tekerlek → Yatay Kaydırma", isOn: $settings.shiftToHorizontalScroll)
+            } header: {
+                Text("Kaydırma")
+            }
+
+            Section {
+                SliderRow("Kaydırma Hızı", value: $settings.scrollSpeedMultiplier, range: 0.5...4.0, step: 0.25, format: "%.2f×")
+            } header: {
+                Text("Hız")
+            }
+
+            Section {
+                ToggleRow("Doğrusal İmleç Hızı (1:1)",
+                          subtitle: "macOS ivme eğrisini kapatır; oyunlar ve tasarım için önerilir.",
+                          isOn: $settings.disableMouseAcceleration)
+                SliderRow("İmleç Hassasiyeti", value: $settings.mousePointerSensitivity, range: 0.5...3.0, step: 0.1, format: "%.1f×")
+            } header: {
+                Text("İmleç")
+            } footer: {
+                Text("Değişiklikler donanım seviyesinde uygulanır ve sistem yeniden başlasa da korunur.")
+            }
+        }
+    }
+}
+
+// MARK: - 4. Pencere Değiştirici
+
+private struct AppSwitcherPane: View {
+    @ObservedObject var settings: AppSettings
+
+    var body: some View {
+        Form {
+            Section {
+                ToggleRow("Pencere Değiştiriciyi Etkinleştir", isOn: $settings.altTabEnabled)
+                PickerRow("Kısayol", selection: $settings.switcherShortcut, options: AltTabShortcut.allCases) { $0.title }
+            } header: {
+                Text("Etkinleştirme")
+            }
+
+            Section {
+                PickerRow("Görünüm Stili", selection: $settings.switcherStyle, options: SwitcherStyle.allCases) { $0.title }
+                PickerRow("Konum", selection: $settings.displayMode, options: SwitcherDisplayMode.allCases) { $0.title }
+                ToggleRow("Yazarak Ara", isOn: $settings.searchFilterEnabled)
+            } header: {
+                Text("Görünüm")
+            } footer: {
+                Text("Değiştirici içinde: ← → gezinme, W pencereyi kapat, Q uygulamadan çık, M küçült, F büyüt.")
+            }
+        }
+    }
+}
+
+// MARK: - 5. Klavye Kısayolları
+
+private struct KeyboardShortcutsPane: View {
+    @ObservedObject var settings: AppSettings
+
+    var body: some View {
+        Form {
+            Section {
+                ToggleRow("Ctrl ➔ Cmd Eşleştirmesi",
+                          subtitle: "Ctrl+C, Ctrl+V, Ctrl+Z, Ctrl+S, Ctrl+F… Windows alışkanlığı.",
+                          isOn: $settings.ctrlToCmdRemapEnabled)
+                ToggleRow("Ctrl+Backspace → Kelime Sil", isOn: $settings.ctrlBackspaceWordDelete)
+                ToggleRow("Ctrl+←/→ → Kelime Atla", isOn: $settings.ctrlArrowWordJump)
+            } header: {
+                Text("Metin Düzenleme")
+            }
+
+            Section {
+                ToggleRow("⌘⌥L → Ekranı Kilitle", isOn: $settings.winLToLockEnabled)
+                ToggleRow("Ctrl+Shift+Esc → Etkinlik Monitörü", isOn: $settings.ctrlShiftEscTaskManager)
+                ToggleRow("⌥E → Yeni Finder Penceresi", isOn: $settings.winEToFileExplorer)
+                ToggleRow("⌥D → Masaüstünü Göster", isOn: $settings.winDToShowDesktop)
+                ToggleRow("⌥V → Pano Geçmişi", isOn: $settings.clipboardHistoryEnabled)
+            } header: {
+                Text("Sistem Kısayolları")
+            }
+
+            Section {
+                PickerRow("Pano Kapasitesi", selection: $settings.maxClipboardItems, options: [25, 50, 100]) {
+                    "\($0) öğe"
+                }
+            } header: {
+                Text("Pano Geçmişi")
+            } footer: {
+                Text("Terminal ve IDE'lerde Ctrl kısayolları otomatik olarak devre dışı bırakılır.")
+            }
+        }
+    }
+}
+
+// MARK: - 6. Otomatik Çıkış
+
+private struct AutoQuitPane: View {
+    @ObservedObject var settings: AppSettings
+    @State private var selectedExclusion: String?
+
+    var body: some View {
+        Form {
+            Section {
+                ToggleRow("Son Pencere Kapanınca Uygulamayı Kapat",
+                          subtitle: "Kırmızı ✕ ile son pencere kapatıldığında uygulama tamamen çıkar.",
+                          isOn: $settings.swiftQuitEnabled)
+                Stepper(value: $settings.swiftQuitDelaySeconds, in: 0...10) {
+                    LabeledContent("Çıkış Gecikmesi") {
+                        Text("\(settings.swiftQuitDelaySeconds) sn").foregroundStyle(.secondary)
+                    }
+                }
+            } header: {
+                Text("Davranış")
+            }
+
+            Section {
+                if settings.swiftQuitExcludedApps.isEmpty {
+                    Text("Hariç tutulan uygulama yok.")
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(settings.swiftQuitExcludedApps, id: \.self) { appId in
+                        LabeledContent(appId) {
+                            Button(role: .destructive) {
+                                removeExclusion(appId)
+                            } label: {
+                                Image(systemName: "minus.circle")
+                            }
+                            .buttonStyle(.borderless)
+                        }
+                    }
+                }
+                Button {
+                    addExclusion()
+                } label: {
+                    Label("Uygulama Ekle…", systemImage: "plus")
+                }
+            } header: {
+                Text("Hariç Tutulan Uygulamalar")
+            } footer: {
+                Text("Oyunlar, IDE'ler ve terminal uygulamaları zaten varsayılan olarak korunur.")
+            }
+        }
+    }
+
+    private func addExclusion() {
+        let panel = NSOpenPanel()
+        panel.directoryURL = URL(fileURLWithPath: "/Applications")
+        panel.canChooseDirectories = false
+        panel.canChooseFiles = true
+        panel.allowedContentTypes = [.application]
+        guard panel.runModal() == .OK,
+              let url = panel.url,
+              let bundle = Bundle(url: url),
+              let bundleId = bundle.bundleIdentifier else { return }
+        if !settings.swiftQuitExcludedApps.contains(bundleId) {
+            settings.swiftQuitExcludedApps.append(bundleId)
+        }
+    }
+
+    private func removeExclusion(_ appId: String) {
+        settings.swiftQuitExcludedApps.removeAll { $0 == appId }
     }
 }

@@ -21,7 +21,7 @@ public final class EventTapManager: @unchecked Sendable {
     private init() {}
     
     public func start() {
-        // HotKeys run independently of Accessibility
+        // Carbon HotKeys run independently of CGEventTap
         DispatchQueue.main.async {
             HotKeyManager.shared.start()
         }
@@ -30,7 +30,7 @@ public final class EventTapManager: @unchecked Sendable {
         if AXIsProcessTrusted() {
             startUnifiedEventTap()
         } else {
-            print("[WinMac] Accessibility permission not yet granted. HotKeys started, CGEventTap deferred.")
+            print("[WinMac] Accessibility permission not yet granted. Carbon HotKeys active, EventTap deferred.")
         }
     }
     
@@ -109,7 +109,7 @@ public final class EventTapManager: @unchecked Sendable {
         }
     }
     
-    // MARK: - Event Handler
+    // MARK: - Event Handler Pipeline
     private func handleSystemEvent(proxy: CGEventTapProxy, type: CGEventType, event: CGEvent) -> Unmanaged<CGEvent>? {
         // Re-enable tap if disabled by system timeout
         if type == .tapDisabledByUserInput || type == .tapDisabledByTimeout {
@@ -119,7 +119,7 @@ public final class EventTapManager: @unchecked Sendable {
             return Unmanaged.passUnretained(event)
         }
         
-        // 1. Mouse Drag & Snap Handling (Single source of truth)
+        // 1. Mouse Drag & Snap Handling (Rectangle Pro Engine)
         if type == .leftMouseDown {
             let loc = NSEvent.mouseLocation
             DispatchQueue.main.async {
@@ -143,7 +143,7 @@ public final class EventTapManager: @unchecked Sendable {
             return Unmanaged.passUnretained(event)
         }
         
-        // 2. Mouse Scroll Inversion (LinearMouse Engine)
+        // 2. Mouse Scroll Inversion & Modifiers (LinearMouse Engine)
         if type == .scrollWheel {
             if let modified = ScrollInverter.shared.handleScrollEvent(event: event) {
                 return Unmanaged.passUnretained(modified)
@@ -155,7 +155,7 @@ public final class EventTapManager: @unchecked Sendable {
         let flags = event.flags
         let keyCode = CGKeyCode(event.getIntegerValueField(.keyboardEventKeycode))
         
-        // 3. Modifier Key Release check (Option or Control released while Alt + Tab HUD is active)
+        // 3. Modifier Key Release Check (Alt + Tab Dismiss)
         if type == .flagsChanged {
             if isAltTabActive {
                 let modifierReleased: Bool
@@ -176,7 +176,7 @@ public final class EventTapManager: @unchecked Sendable {
             return Unmanaged.passUnretained(event)
         }
         
-        // 4. Alt + Tab Trigger (Option+Tab or Control+Tab configurable)
+        // 4. Alt + Tab Trigger (Option+Tab or Control+Tab)
         let altTabEnabled = defaults.object(forKey: "altTabEnabled") as? Bool ?? true
         let shortcutPref = defaults.string(forKey: "switcherShortcut") ?? AltTabShortcut.optionTab.rawValue
         let isCtrlTabPref = shortcutPref == AltTabShortcut.ctrlTab.rawValue
@@ -186,11 +186,9 @@ public final class EventTapManager: @unchecked Sendable {
             let currentModifier: TriggerModifier
             
             if isCtrlTabPref {
-                // Control + Tab
                 isTriggerMatch = keyCode == 48 && flags.contains(.maskControl)
                 currentModifier = .control
             } else {
-                // Option + Tab
                 isTriggerMatch = keyCode == 48 && flags.contains(.maskAlternate)
                 currentModifier = .option
             }
@@ -218,7 +216,7 @@ public final class EventTapManager: @unchecked Sendable {
                         }
                     }
                 }
-                return nil // Suppress raw event so system doesn't beep
+                return nil // Suppress raw Tab so system doesn't beep
             }
             
             // 5. In-Switcher Navigation Keys
@@ -231,13 +229,13 @@ public final class EventTapManager: @unchecked Sendable {
                     }
                     return nil
                 }
-                // Left arrow (KeyCode 123)
-                if keyCode == 123 {
+                // Left arrow (KeyCode 123) / Up arrow (126)
+                if keyCode == 123 || keyCode == 126 {
                     DispatchQueue.main.async { AltTabState.shared.selectPrevious() }
                     return nil
                 }
-                // Right arrow (KeyCode 124)
-                if keyCode == 124 {
+                // Right arrow (KeyCode 124) / Down arrow (125)
+                if keyCode == 124 || keyCode == 125 {
                     DispatchQueue.main.async { AltTabState.shared.selectNext() }
                     return nil
                 }
@@ -257,33 +255,36 @@ public final class EventTapManager: @unchecked Sendable {
                     DispatchQueue.main.async { AltTabState.shared.quitSelectedApp() }
                     return nil
                 }
+                // 'M' key (KeyCode 46) -> Minimize focused window
+                if keyCode == 46 {
+                    DispatchQueue.main.async { AltTabState.shared.minimizeCurrentWindow() }
+                    return nil
+                }
+                // 'F' key (KeyCode 3) -> Maximize focused window
+                if keyCode == 3 {
+                    DispatchQueue.main.async { AltTabState.shared.maximizeCurrentWindow() }
+                    return nil
+                }
             }
         }
         
-        // 6. Windows Shortcuts: Win + L to Lock Screen (Option + Command + L)
-        let winL = defaults.object(forKey: "winLToLockEnabled") as? Bool ?? true
-        if type == .keyDown && winL && keyCode == 37 && flags.contains(.maskAlternate) && flags.contains(.maskCommand) {
-            DispatchQueue.global(qos: .userInitiated).async {
-                let task = Process()
-                task.launchPath = "/usr/bin/pmset"
-                task.arguments = ["displaysleepnow"]
-                try? task.run()
+        // 6. System Shortcuts (Win+L lock, Win+Shift+S screenshot)
+        if type == .keyDown {
+            if let sysEvent = SystemShortcuts.shared.handleKeyEvent(type: type, event: event) {
+                if let remappedEvent = CtrlToCmdMapper.shared.handleKeyEvent(type: type, event: sysEvent) {
+                    return Unmanaged.passUnretained(remappedEvent)
+                } else {
+                    return nil
+                }
+            } else {
+                return nil
             }
+        }
+        
+        if let remappedEvent = CtrlToCmdMapper.shared.handleKeyEvent(type: type, event: event) {
+            return Unmanaged.passUnretained(remappedEvent)
+        } else {
             return nil
         }
-        
-        // 7. Windows Shortcuts: Ctrl + Shift + Esc -> Task Manager (Activity Monitor)
-        let ctrlShiftEsc = defaults.object(forKey: "ctrlShiftEscTaskManager") as? Bool ?? true
-        if type == .keyDown && ctrlShiftEsc && keyCode == 53 && flags.contains(.maskControl) && flags.contains(.maskShift) {
-            DispatchQueue.main.async {
-                NSWorkspace.shared.openApplication(
-                    at: URL(fileURLWithPath: "/System/Applications/Utilities/Activity Monitor.app"),
-                    configuration: NSWorkspace.OpenConfiguration()
-                )
-            }
-            return nil
-        }
-        
-        return Unmanaged.passUnretained(event)
     }
 }

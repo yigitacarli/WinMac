@@ -12,7 +12,7 @@ public final class ScrollInverter: @unchecked Sendable {
     public func handleScrollEvent(event: CGEvent) -> CGEvent? {
         let view = ScrollWheelEventView(event)
         
-        // LinearMouse rule: Trackpad continuous scrolls must never be inverted
+        // LinearMouse rule: Trackpad continuous scrolls must never be inverted or altered
         if view.continuous {
             return event
         }
@@ -21,11 +21,32 @@ public final class ScrollInverter: @unchecked Sendable {
         let invertY = defaults.object(forKey: "invertMouseWheel") as? Bool ?? false
         let invertX = defaults.object(forKey: "invertHorizontalScroll") as? Bool ?? false
         let speed = defaults.object(forKey: "scrollSpeedMultiplier") as? Double ?? 1.0
+        let shiftHScroll = defaults.object(forKey: "shiftToHorizontalScroll") as? Bool ?? true
         
+        let flags = event.flags
+        
+        // Shift + Wheel -> Horizontal Scroll
+        if shiftHScroll && flags.contains(.maskShift) && !flags.contains(.maskCommand) && !flags.contains(.maskControl) {
+            let originalY = view.deltaY
+            let originalYPt = view.deltaYPt
+            let originalYFixedPt = view.deltaYFixedPt
+            
+            if originalY != 0 {
+                view.deltaX = originalY
+                view.deltaXPt = originalYPt
+                view.deltaXFixedPt = originalYFixedPt
+                view.deltaY = 0
+                view.deltaYPt = 0
+                view.deltaYFixedPt = 0
+            }
+        }
+        
+        // Invert axes if enabled
         if invertY || invertX {
             view.negate(vertically: invertY, horizontally: invertX)
         }
         
+        // Apply speed multiplier
         if speed != 1.0 && speed > 0.0 {
             view.scale(factorX: speed, factorY: speed)
         }

@@ -12,23 +12,20 @@ public final class SettingsWindowController {
     public func show() {
         if window == nil {
             let win = NSWindow(
-                contentRect: NSRect(x: 0, y: 0, width: 720, height: 490),
-                styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
+                contentRect: NSRect(x: 0, y: 0, width: 720, height: 500),
+                styleMask: [.titled, .closable, .miniaturizable, .fullSizeContentView],
                 backing: .buffered,
                 defer: false
             )
-            win.title = "WinMac"
-            win.titlebarAppearsTransparent = true
-            win.titleVisibility = .hidden
+            win.title = "WinMac Ayarları"
             win.minSize = NSSize(width: 640, height: 440)
             win.center()
-            win.setFrameAutosaveName("WinMacSettingsWindow_v4")
+            win.setFrameAutosaveName("WinMacSettingsWindow_v5")
             win.contentView = NSHostingView(rootView: SettingsView())
             win.isReleasedWhenClosed = false
             self.window = win
         }
-        
-        window?.center()
+
         window?.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
     }

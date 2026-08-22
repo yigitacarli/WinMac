@@ -90,15 +90,12 @@ public final class WindowEngine {
             }
         }
         
-        // Put the frontmost application's other windows or the most recently used window at the beginning
-        if let frontApp = NSWorkspace.shared.frontmostApplication {
-            let frontPid = frontApp.processIdentifier
+        // Put the frontmost application's windows FIRST (index 0 = currently active window)
+        if let frontPid = NSWorkspace.shared.frontmostApplication?.processIdentifier {
             result.sort { (w1, w2) in
-                if w1.pid == frontPid && w2.pid != frontPid {
-                    return false
-                } else if w1.pid != frontPid && w2.pid == frontPid {
-                    return true
-                }
+                let w1Front = w1.pid == frontPid
+                let w2Front = w2.pid == frontPid
+                if w1Front != w2Front { return w1Front }
                 return false
             }
         }
