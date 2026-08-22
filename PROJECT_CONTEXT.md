@@ -33,6 +33,7 @@
 6. **Her açılışta ayar penceresi zorla açılıyordu** → yalnızca erişilebilirlik izni eksikse açılır; sonrasında Dock tıklaması (`applicationShouldHandleReopen`) açar.
 7. **Sürüm numarası elle gömülüydu** → `AppDelegate.appVersion` CFBundleShortVersionString'ten okur.
 8. Status bar menüsü işlevsel adlarla sadeleştirildi (üçüncü parti marka referansları kaldırıldı).
+9. `.github_sources/` (Rectangle, AltTab, LinearMouse, SwiftQuit referans klonları) repodan çıkarılıp `.gitignore`'a eklendi; yalnızca yerel portlama referansı olarak kalır.
 
 ---
 

@@ -4,3 +4,6 @@
 xcuserdata/
 *.xcuserstate
 DerivedData/
+
+# Reference source clones (local only)
+.github_sources/
