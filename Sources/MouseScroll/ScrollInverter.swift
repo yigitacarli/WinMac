@@ -12,8 +12,13 @@ public final class ScrollInverter: @unchecked Sendable {
     public func handleScrollEvent(event: CGEvent) -> CGEvent? {
         let view = ScrollWheelEventView(event)
         
-        // LinearMouse rule: Trackpad continuous scrolls must never be inverted or altered
-        if view.continuous {
+        // Trackpad gestures carry scroll phases; they must never be inverted or altered.
+        let scrollPhase = event.getIntegerValueField(.scrollWheelEventScrollPhase)
+        let momentumPhase = event.getIntegerValueField(.scrollWheelEventMomentumPhase)
+        
+        // Discrete click-wheels (continuous == 0) and smooth-scrolling mice
+        // (continuous == 1 but no trackpad phase) are BOTH mouse input.
+        if view.continuous && (scrollPhase != 0 || momentumPhase != 0) {
             return event
         }
         
@@ -122,12 +127,16 @@ public final class ScrollInverter: @unchecked Sendable {
             }
         }
         
-        // Update user defaults tracking speed dynamically so system stays in sync
+        // Update system mouse scaling: -1 disables acceleration completely (linear 1:1),
+        // deleting the key restores macOS native curve and Settings control.
         DispatchQueue.global(qos: .utility).async {
             let task = Process()
             task.launchPath = "/usr/bin/defaults"
-            let scaling = disableAcceleration ? (sensitivity * 1.5) : (sensitivity * 1.5)
-            task.arguments = ["write", "-g", "com.apple.mouse.scaling", String(format: "%.2f", scaling)]
+            if disableAcceleration {
+                task.arguments = ["write", "-g", "com.apple.mouse.scaling", "-1"]
+            } else {
+                task.arguments = ["delete", "-g", "com.apple.mouse.scaling"]
+            }
             try? task.run()
         }
     }

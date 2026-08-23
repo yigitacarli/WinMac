@@ -36,6 +36,15 @@
 9. `.github_sources/` (Rectangle, AltTab, LinearMouse, SwiftQuit referans klonları) repodan çıkarılıp `.gitignore`'a eklendi; yalnızca yerel portlama referansı olarak kalır.
 10. **Build düzeltmesi:** `Documents` klasörünün iCloud senkronu SwiftPM `build.db` kilitlenmesine yol açıp `swift build`'i exit≠1 ile kesiyordu. `scripts/package_app.sh` artık `~/Library/Caches/WinMacBuild` scratch-path ile derliyor; `/Applications/WinMac.app` v1.3 binary'si ile yeniden paketlendi ve doğrulandı.
 
+### v1.3.1 — Mouse & AltTab İşlevsel Düzeltmeleri (23 Ağustos 2026)
+1. **Fare özellikleri hiç çalışmıyordu (yumuşak kaydırmalı fareler):** `ScrollInverter`, `scrollWheelEventIsContinuous == 1` olan TÜM olayları trackpad sanıp değiştirmeden geçiyordu; Logitech vb. modern fareler sürekli olay gönderdiği için ters çevirme/hız/Shift+yatay asla uygulanmıyordu. Yeni kural: yalnızca trackpad jesti taşıyan olaylar (`scrollPhase != 0 || momentumPhase != 0`) dokunulur; discrete tekerlek VE sürekli-fare olayları ayarlara tabidir.
+2. **Doğrusal ivme yanlış sistem değeri yazıyordu:** `com.apple.mouse.scaling`'e `sensitivity*1.5` yerine, doğrusal modda `-1` (ivme tamamen kapalı) yazılıyor; kapalıyken anahtar silinip macOS native eğrisine dönülüyor.
+3. **AltTab görünüm stilleri kozmetiktu:** `switcherStyle` seçimlerinden yalnızca `thumbnails` kontrol ediliyor, o da hiç doldurulmayan `window.thumbnail`'a bağlıydı → 4 stil de aynı simge şeridini basıyordu.
+   - **Büyük Simgeler:** 88px simge kartları (Command+Tab benzeri)
+   - **Pencere Önizlemeleri:** canlı ekran görüntülü 160×122 kartlar — `ThumbnailCache.thumbnail(forPid:axBounds:)` AX↔CG koordinat dönüşümüyle gerçek CGWindowID çözümlüyor
+   - **Kompakt Izgara:** 58px yoğun mini kartlar + uygulama adı
+   - **Ayrıntılı Liste:** 420px dikey liste, başlık + uygulama adı + küçültülmüş göstergesi
+
 ---
 
 ## 🏗️ Proje Mimarisi & Dosya Haritası

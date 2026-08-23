@@ -34,7 +34,19 @@ public final class AltTabState: ObservableObject {
     }
     
     public func reloadWindows() {
-        let scanned = WindowEngine.shared.getWindows()
+        var scanned = WindowEngine.shared.getWindows()
+        
+        // Capture live window thumbnails for the "Pencere Önizlemeleri" style
+        if AppSettings.shared.switcherStyle == .thumbnails {
+            for model in scanned where model.bundleId != "com.apple.desktop" {
+                if model.thumbnail == nil, let thumb = ThumbnailCache.shared.thumbnail(forPid: model.pid, axBounds: model.bounds) {
+                    if let idx = scanned.firstIndex(where: { $0.id == model.id }) {
+                        scanned[idx].thumbnail = thumb
+                    }
+                }
+            }
+        }
+        
         self.windows = scanned
         self.searchText = ""
         // Index 0 = currently focused window; the caller advances with selectNext()
