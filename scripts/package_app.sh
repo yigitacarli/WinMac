@@ -1,8 +1,11 @@
 #!/bin/bash
 set -e
 
+# Build outside iCloud-synced Documents folder to avoid SwiftPM build.db lock errors
+SCRATCH_PATH="$HOME/Library/Caches/WinMacBuild"
+
 echo "🔨 Building WinMac (Release Mode)..."
-swift build -c release
+swift build -c release --scratch-path "$SCRATCH_PATH"
 
 APP_DIR="build/WinMac.app"
 CONTENTS_DIR="$APP_DIR/Contents"
@@ -15,7 +18,7 @@ mkdir -p "$MACOS_DIR"
 mkdir -p "$RESOURCES_DIR"
 
 # Copy binary
-cp .build/release/WinMac "$MACOS_DIR/WinMac"
+cp "$SCRATCH_PATH/release/WinMac" "$MACOS_DIR/WinMac"
 chmod +x "$MACOS_DIR/WinMac"
 
 # Copy Info.plist and Icon

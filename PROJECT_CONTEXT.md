@@ -34,6 +34,7 @@
 7. **Sürüm numarası elle gömülüydu** → `AppDelegate.appVersion` CFBundleShortVersionString'ten okur.
 8. Status bar menüsü işlevsel adlarla sadeleştirildi (üçüncü parti marka referansları kaldırıldı).
 9. `.github_sources/` (Rectangle, AltTab, LinearMouse, SwiftQuit referans klonları) repodan çıkarılıp `.gitignore`'a eklendi; yalnızca yerel portlama referansı olarak kalır.
+10. **Build düzeltmesi:** `Documents` klasörünün iCloud senkronu SwiftPM `build.db` kilitlenmesine yol açıp `swift build`'i exit≠1 ile kesiyordu. `scripts/package_app.sh` artık `~/Library/Caches/WinMacBuild` scratch-path ile derliyor; `/Applications/WinMac.app` v1.3 binary'si ile yeniden paketlendi ve doğrulandı.
 
 ---
 
