@@ -21,6 +21,7 @@ private enum Design {
         case .general: return Color(nsColor: .systemGray)
         case .windowManagement: return Color(nsColor: .systemBlue)
         case .appSwitcher: return Color(nsColor: .systemIndigo)
+        case .mouseControl: return Color(nsColor: .systemPurple)
         case .keyboardShortcuts: return Color(nsColor: .systemTeal)
         case .autoQuit: return Color(nsColor: .systemOrange)
         }
@@ -33,6 +34,7 @@ public enum SettingsPane: String, CaseIterable, Identifiable, Hashable {
     case general
     case windowManagement
     case appSwitcher
+    case mouseControl
     case keyboardShortcuts
     case autoQuit
 
@@ -43,6 +45,7 @@ public enum SettingsPane: String, CaseIterable, Identifiable, Hashable {
         case .general: return "Genel"
         case .windowManagement: return "Pencere Yönetimi"
         case .appSwitcher: return "Pencere Değiştirici"
+        case .mouseControl: return "Fare"
         case .keyboardShortcuts: return "Klavye Kısayolları"
         case .autoQuit: return "Otomatik Çıkış"
         }
@@ -53,6 +56,7 @@ public enum SettingsPane: String, CaseIterable, Identifiable, Hashable {
         case .general: return "Başlangıç ve izinler"
         case .windowManagement: return "Yaslama ve kısayollar"
         case .appSwitcher: return "Görünüm ve davranış"
+        case .mouseControl: return "İvme, hız, cihaz bilgisi"
         case .keyboardShortcuts: return "Eşleştirmeler"
         case .autoQuit: return "Arka plan temizliği"
         }
@@ -63,6 +67,7 @@ public enum SettingsPane: String, CaseIterable, Identifiable, Hashable {
         case .general: return "gearshape.fill"
         case .windowManagement: return "rectangle.split.2x1.fill"
         case .appSwitcher: return "square.stack.3d.up.fill"
+        case .mouseControl: return "computermouse.fill"
         case .keyboardShortcuts: return "command.square.fill"
         case .autoQuit: return "power.dotted"
         }
@@ -127,6 +132,8 @@ public struct SettingsView: View {
                     WindowManagementPane(settings: settings)
                 case .appSwitcher:
                     AppSwitcherPane(settings: settings)
+                case .mouseControl:
+                    MouseControlPane(settings: settings)
                 case .keyboardShortcuts:
                     KeyboardShortcutsPane(settings: settings)
                 case .autoQuit:
@@ -517,7 +524,122 @@ private struct AppSwitcherPane: View {
     }
 }
 
-// MARK: - 4. Klavye Kısayolları
+// MARK: - 4. Fare
+
+private struct MouseControlPane: View {
+    @ObservedObject var settings: AppSettings
+    @ObservedObject private var monitor = MousePointerMonitor.shared
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            SettingsCard(
+                header: "Etkinleştirme",
+                footer: "Fare denetimi private IOKit API'lerine dayanır; macOS sürümüne göre davranışı değişebilir. Kapatıldığında sistem varsayılanları geri yüklenir."
+            ) {
+                ToggleRow("Fare Denetimi", isOn: $settings.mousePointerEnabled)
+            }
+
+            SettingsCard(header: "İmleç") {
+                ToggleRow("İvmeyi Kapat (1:1)",
+                          subtitle: "macOS ivme eğrisini devre dışı bırakır; oyun ve tasarım için.",
+                          isOn: $settings.mousePointerDisableAccel)
+                if !settings.mousePointerDisableAccel {
+                    RowDivider()
+                    SliderRow("İvme", value: $settings.mousePointerAcceleration,
+                              range: 0.0...2.0, step: 0.05, format: "%.2f")
+                }
+                RowDivider()
+                SliderRow("Hız", value: $settings.mousePointerSpeed,
+                          range: 0.25...3.0, step: 0.05, format: "%.2f×")
+            }
+            .disabled(!settings.mousePointerEnabled)
+            .opacity(settings.mousePointerEnabled ? 1 : 0.5)
+
+            SettingsCard(header: "Bağlı Cihaz") {
+                SettingRow("Ad") { infoValue(monitor.deviceName) }
+                RowDivider()
+                SettingRow("Donanım Çözünürlüğü (DPI)") {
+                    infoValue(monitor.nativeResolution.map { "\($0)" })
+                }
+                RowDivider()
+                SettingRow("Pil") { infoValue(monitor.batteryPercent.map { "%\($0)" }) }
+                RowDivider()
+                SettingRow("Sorgulama Hızı") { infoValue(monitor.pollingRateHz.map { "\($0) Hz" }) }
+            }
+
+            AppExclusionCard(
+                header: "Devre Dışı Uygulamalar",
+                footer: "Bu uygulamalardan biri öndeyken imleç ayarları geçici olarak askıya alınır.",
+                apps: $settings.mousePointerExcludedApps
+            )
+        }
+        .onAppear { monitor.beginObserving() }
+        .onDisappear { monitor.endObserving() }
+    }
+
+    @ViewBuilder
+    private func infoValue(_ text: String?) -> some View {
+        Text(text ?? "—")
+            .font(.system(size: 12).monospacedDigit())
+            .foregroundStyle(.secondary)
+    }
+}
+
+/// Reusable "add / remove application bundle IDs" card.
+struct AppExclusionCard: View {
+    let header: String
+    let footer: String
+    @Binding var apps: [String]
+
+    var body: some View {
+        SettingsCard(header: header, footer: footer) {
+            if apps.isEmpty {
+                Text("Liste boş.")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, Design.cardInset)
+                    .padding(.vertical, 12)
+            } else {
+                ForEach(Array(apps.enumerated()), id: \.element) { index, appId in
+                    if index > 0 { RowDivider() }
+                    SettingRow(appId) {
+                        Button(role: .destructive) {
+                            apps.removeAll { $0 == appId }
+                        } label: {
+                            Image(systemName: "minus.circle.fill")
+                                .foregroundStyle(Color(nsColor: .systemRed))
+                        }
+                        .buttonStyle(.borderless)
+                    }
+                }
+                RowDivider()
+            }
+            SettingRow("Uygulama Ekle") {
+                Button {
+                    add()
+                } label: {
+                    Label("Seç…", systemImage: "plus")
+                }
+                .controlSize(.small)
+            }
+        }
+    }
+
+    private func add() {
+        let panel = NSOpenPanel()
+        panel.directoryURL = URL(fileURLWithPath: "/Applications")
+        panel.canChooseDirectories = false
+        panel.canChooseFiles = true
+        panel.allowedContentTypes = [.application]
+        guard panel.runModal() == .OK,
+              let url = panel.url,
+              let bundle = Bundle(url: url),
+              let bundleId = bundle.bundleIdentifier else { return }
+        if !apps.contains(bundleId) { apps.append(bundleId) }
+    }
+}
+
+// MARK: - 5. Klavye Kısayolları
 
 private struct KeyboardShortcutsPane: View {
     @ObservedObject var settings: AppSettings
@@ -558,7 +680,7 @@ private struct KeyboardShortcutsPane: View {
     }
 }
 
-// MARK: - 5. Otomatik Çıkış
+// MARK: - 6. Otomatik Çıkış
 
 private struct AutoQuitPane: View {
     @ObservedObject var settings: AppSettings

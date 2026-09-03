@@ -155,6 +155,9 @@ hopeful-lovelace/
     │   ├── AltTabState.swift         # Seçim, deadzone hover, arama filtresi
     │   ├── AltTabHUDController.swift # popUpMenu seviyeli NSPanel + dışarı-tıkla-kapat
     │   └── Views/                    # AltTabHUDView (Simgeler + Liste), SearchBarView
+    ├── MousePointer/
+    │   ├── MousePointerEngine.swift  # IOHID imleç ivmesi/hızı override + restore; reconnect/wake/per-app
+    │   └── MousePointerMonitor.swift # salt-okunur: cihaz adı, DPI, pil (IOPS), sorgulama hızı (listen-only tap)
     ├── KeyboardBridge/
     │   ├── CtrlToCmdMapper.swift     # Ctrl+C/V/Z/Y/A/S/F/W/T/P/N/R, Backspace, Win tuşları
     │   └── SystemShortcuts.swift     # Sistem kısayolları ve Finder / Task Manager tetikleyicileri

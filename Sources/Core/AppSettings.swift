@@ -178,7 +178,42 @@ public final class AppSettings: ObservableObject {
     @Published public var maxClipboardItems: Int {
         didSet { defaults.set(maxClipboardItems, forKey: "maxClipboardItems") }
     }
-    
+
+    // MARK: - 7. Mouse Pointer Control (cursor acceleration & speed)
+    @Published public var mousePointerEnabled: Bool {
+        didSet {
+            defaults.set(mousePointerEnabled, forKey: "mousePointerEnabled")
+            MousePointerEngine.shared.syncFromSettings()
+        }
+    }
+    @Published public var mousePointerDisableAccel: Bool {
+        didSet {
+            defaults.set(mousePointerDisableAccel, forKey: "mousePointerDisableAccel")
+            MousePointerEngine.shared.syncFromSettings()
+        }
+    }
+    /// Cursor acceleration when acceleration is NOT disabled. macOS default ≈ 0.6875.
+    @Published public var mousePointerAcceleration: Double {
+        didSet {
+            defaults.set(mousePointerAcceleration, forKey: "mousePointerAcceleration")
+            MousePointerEngine.shared.syncFromSettings()
+        }
+    }
+    /// Speed as a multiplier over the device's native resolution (2.0 = twice as fast).
+    @Published public var mousePointerSpeed: Double {
+        didSet {
+            defaults.set(mousePointerSpeed, forKey: "mousePointerSpeed")
+            MousePointerEngine.shared.syncFromSettings()
+        }
+    }
+    /// While one of these apps is frontmost, pointer overrides are suspended.
+    @Published public var mousePointerExcludedApps: [String] {
+        didSet {
+            defaults.set(mousePointerExcludedApps, forKey: "mousePointerExcludedApps")
+            MousePointerEngine.shared.syncFromSettings()
+        }
+    }
+
     // MARK: - Initializer
     private init() {
         self.showInDock = defaults.object(forKey: "showInDock") as? Bool ?? true
@@ -237,5 +272,12 @@ public final class AppSettings: ObservableObject {
         // Clipboard
         self.clipboardHistoryEnabled = defaults.object(forKey: "clipboardHistoryEnabled") as? Bool ?? true
         self.maxClipboardItems = defaults.object(forKey: "maxClipboardItems") as? Int ?? 50
+
+        // Mouse Pointer Control (off by default; disabling accel is the common use)
+        self.mousePointerEnabled = defaults.object(forKey: "mousePointerEnabled") as? Bool ?? false
+        self.mousePointerDisableAccel = defaults.object(forKey: "mousePointerDisableAccel") as? Bool ?? true
+        self.mousePointerAcceleration = defaults.object(forKey: "mousePointerAcceleration") as? Double ?? 0.6875
+        self.mousePointerSpeed = defaults.object(forKey: "mousePointerSpeed") as? Double ?? 1.0
+        self.mousePointerExcludedApps = defaults.stringArray(forKey: "mousePointerExcludedApps") ?? []
     }
 }

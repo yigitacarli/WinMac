@@ -4,9 +4,32 @@
 > Amaç: gelecekteki oturumların kod tabanını sıfırdan taramadan devam edebilmesi ve
 > GitHub'a yükleme öncesi yapılacak temizliğin net bir listesi.
 >
-> **DURUM (3 Eylül 2026):** Bölüm 3-A, 3-B, 3-C ve v1.5 temizliği **tamamlandı**
-> (bkz. PROJECT_CONTEXT.md → Sürüm 1.5). Kalanlar: Bölüm 3-D (opsiyonel kod notları)
-> ve elle fonksiyonel test.
+> **DURUM (3 Eylül 2026):** v1.5 + v1.6 tamamlandı (bkz. PROJECT_CONTEXT.md).
+> Lisans GPL-3.0. Fare modülü LinearMouse temelli geri eklendi. Kalan: elle
+> fonksiyonel test (özellikle gerçek harici fareyle Fare modülü).
+
+---
+
+## 0. Doğrulama Sonuçları (v1.6 — kod incelemesi + üst repo karşılaştırması)
+
+Üst repolar `.github_sources/` altında incelendi (Rectangle, alt-tab-macos,
+swiftquit, linearmouse). WinMac motorları davranışsal yeniden yazım; kod kopyası yok.
+
+| Modül | Durum | Not |
+|---|---|---|
+| Pencere Yaslama | ✅ | Kısayol → SnapAction eşlemesi Ayarlar "Kısayol Referansı" ile tutarlı. `⌃⌥=`/`⌃⌥−` büyüt/küçült **çalışmıyordu** (maximize'a düşüyordu) → kaldırıldı. Üst/alt yarı için ölü döngü kolları temizlendi. |
+| Pencere Değiştirici | ✅ | `EventTapManager`'ın çağırdığı tüm `AltTabState` metotları mevcut. 2 stil (Simgeler/Liste) çalışıyor. Thumbnail kodu tamamen silindi. |
+| Otomatik Çıkış | ✅ | SwiftQuit `Swindler`+event tabanlı; WinMac `didDeactivate` + CGWindowList/AX çift doğrulama — bağımsız. Varsayılan **kapalı**. Geniş exclude listesi. |
+| Klavye Kısayolları | ✅ | Terminal/IDE exclude'ları çalışıyor; `SystemShortcuts` + `CtrlToCmdMapper` her ikisinde Win+L mantığı var (çift-işlem riski düşük, ikisi de `return nil`). |
+| Pano Geçmişi | ✅ | 0.5 sn NSPasteboard polling, düz metin. |
+| **Fare Denetimi** | ⚠️ **test edilmedi (donanım yok)** | Bu makinede yalnızca trackpad var; motor trackpad'i **bilinçli dışlıyor** (yalnızca Mouse usage'a uyan servisler), bu yüzden inert kaldığı doğrulandı. Gerçek harici fareyle: baseline yakalama + apply + restore + reconnect + wake + per-app mantığı **elle test edilmeli**. Private IOKit SPI (`IOHIDEventSystemClient*`) `dlsym` ile; symbol yoksa no-op. |
+
+**Bilinen küçük konular (aciliyet yok):**
+- `EventTapManager.handleSystemEvent` pipeline yorumları 1→3→4→5→6 (2 numara
+  eski scroll dalıydı) — kozmetik.
+- `AppDelegate` `EventTapManager.start()` / `SwiftQuitEngine.start()` /
+  `MousePointerEngine.start()` iki kez çağrılıyor (doğrudan + permission sink);
+  hepsi guard'lı, zararsız.
 
 ---
 

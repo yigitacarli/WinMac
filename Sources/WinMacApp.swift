@@ -27,13 +27,15 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         setupStatusBar()
         EventTapManager.shared.start()
         SwiftQuitEngine.shared.start()
-        
+        MousePointerEngine.shared.start()
+
         PermissionsManager.shared.$hasAccessibilityPermission
             .receive(on: DispatchQueue.main)
             .sink { [weak self] hasAccess in
                 if hasAccess {
                     EventTapManager.shared.start()
                     SwiftQuitEngine.shared.start()
+                    MousePointerEngine.shared.start()
                 }
                 self?.updateStatusMenu()
             }
@@ -52,6 +54,11 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
     public func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         SettingsWindowController.shared.show()
         return true
+    }
+
+    public func applicationWillTerminate(_ notification: Notification) {
+        // Restore the system pointer settings we overrode.
+        MousePointerEngine.shared.stop()
     }
     
     private func setupStatusBar() {
@@ -107,6 +114,14 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         )
         altTabItem.target = self
         menu.addItem(altTabItem)
+
+        let mouseItem = NSMenuItem(
+            title: "Fare Denetimi: \(AppSettings.shared.mousePointerEnabled ? "Açık" : "Kapalı")",
+            action: #selector(toggleMousePointer),
+            keyEquivalent: ""
+        )
+        mouseItem.target = self
+        menu.addItem(mouseItem)
         
         let ctrlCmdItem = NSMenuItem(
             title: "Ctrl ➔ Cmd Kısayolları: \(AppSettings.shared.ctrlToCmdRemapEnabled ? "Açık" : "Kapalı")",
@@ -159,6 +174,11 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
     
     @objc private func toggleAltTab() {
         AppSettings.shared.altTabEnabled.toggle()
+        updateStatusMenu()
+    }
+
+    @objc private func toggleMousePointer() {
+        AppSettings.shared.mousePointerEnabled.toggle()
         updateStatusMenu()
     }
     
