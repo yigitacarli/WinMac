@@ -1,9 +1,16 @@
+# macOS
 .DS_Store
+
+# SwiftPM / Xcode build artifacts
 .build/
 .swiftpm/
 xcuserdata/
 *.xcuserstate
 DerivedData/
 
-# Reference source clones (local only)
+# Packaged app output (produced by scripts/package_app.sh)
+build/
+*.dmg
+
+# Reference source clones (local only, not distributed)
 .github_sources/

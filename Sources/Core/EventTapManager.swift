@@ -34,7 +34,7 @@ public final class EventTapManager: @unchecked Sendable {
         }
     }
     
-    public func startScrollEventTapIfNeeded() {
+    public func startEventTapIfNeeded() {
         guard globalEventTap == nil, AXIsProcessTrusted() else { return }
         startUnifiedEventTap()
     }
@@ -49,7 +49,6 @@ public final class EventTapManager: @unchecked Sendable {
         guard globalEventTap == nil else { return }
         
         let eventMask: CGEventMask = (
-            (1 << CGEventType.scrollWheel.rawValue) |
             (1 << CGEventType.flagsChanged.rawValue) |
             (1 << CGEventType.keyDown.rawValue) |
             (1 << CGEventType.leftMouseDown.rawValue) |
@@ -143,14 +142,6 @@ public final class EventTapManager: @unchecked Sendable {
             return Unmanaged.passUnretained(event)
         }
         
-        // 2. Mouse Scroll Inversion & Modifiers (LinearMouse Engine)
-        if type == .scrollWheel {
-            if let modified = ScrollInverter.shared.handleScrollEvent(event: event) {
-                return Unmanaged.passUnretained(modified)
-            }
-            return nil
-        }
-        
         let defaults = UserDefaults.standard
         let flags = event.flags
         let keyCode = CGKeyCode(event.getIntegerValueField(.keyboardEventKeycode))
@@ -195,8 +186,11 @@ public final class EventTapManager: @unchecked Sendable {
             
             if isTriggerMatch {
                 let isBackwards = flags.contains(.maskShift)
+                // Auto-repeat must not wrap: pinning at the ends during a held Tab matches
+                // the original's KeyRepeatTimer behaviour.
+                let isAutoRepeat = event.getIntegerValueField(.keyboardEventAutorepeat) != 0
                 activeTriggerModifier = currentModifier
-                
+
                 if !isAltTabActive {
                     isAltTabActive = true
                     DispatchQueue.main.async {
@@ -210,16 +204,17 @@ public final class EventTapManager: @unchecked Sendable {
                 } else {
                     DispatchQueue.main.async {
                         if isBackwards {
-                            AltTabState.shared.selectPrevious()
+                            AltTabState.shared.selectPrevious(wrapAllowed: !isAutoRepeat)
                         } else {
-                            AltTabState.shared.selectNext()
+                            AltTabState.shared.selectNext(wrapAllowed: !isAutoRepeat)
                         }
                     }
                 }
                 return nil // Suppress raw Tab so system doesn't beep
             }
-            
-            // 5. In-Switcher Navigation Keys
+
+            // 5. In-Switcher Navigation Keys — the single input authority for the switcher;
+            // no local NSEvent monitor runs in parallel.
             if isAltTabActive {
                 // Escape key (KeyCode 53) -> Cancel
                 if keyCode == 53 {
@@ -246,23 +241,44 @@ public final class EventTapManager: @unchecked Sendable {
                     return nil
                 }
                 // 'W' key (KeyCode 13) -> Close focused window
-                if keyCode == 13 {
+                if keyCode == 13 && !flags.contains(.maskAlternate) && !flags.contains(.maskCommand) {
                     DispatchQueue.main.async { AltTabState.shared.closeSelectedWindow() }
                     return nil
                 }
                 // 'Q' key (KeyCode 12) -> Quit focused app
-                if keyCode == 12 {
+                if keyCode == 12 && !flags.contains(.maskAlternate) && !flags.contains(.maskCommand) {
                     DispatchQueue.main.async { AltTabState.shared.quitSelectedApp() }
                     return nil
                 }
                 // 'M' key (KeyCode 46) -> Minimize focused window
-                if keyCode == 46 {
+                if keyCode == 46 && !flags.contains(.maskAlternate) && !flags.contains(.maskCommand) {
                     DispatchQueue.main.async { AltTabState.shared.minimizeCurrentWindow() }
                     return nil
                 }
                 // 'F' key (KeyCode 3) -> Maximize focused window
-                if keyCode == 3 {
+                if keyCode == 3 && !flags.contains(.maskAlternate) && !flags.contains(.maskCommand) {
                     DispatchQueue.main.async { AltTabState.shared.maximizeCurrentWindow() }
+                    return nil
+                }
+                // Backspace (KeyCode 51) edits the search filter
+                let searchEnabled = defaults.object(forKey: "searchFilterEnabled") as? Bool ?? true
+                if searchEnabled && keyCode == 51 {
+                    DispatchQueue.main.async {
+                        if !AltTabState.shared.searchText.isEmpty {
+                            AltTabState.shared.searchText.removeLast()
+                        }
+                    }
+                    return nil
+                }
+                // Printable characters feed the search filter; everything else passes through
+                if searchEnabled, let text = Self.keyboardString(for: event),
+                   text.count == 1,
+                   let scalar = text.unicodeScalars.first,
+                   CharacterSet.alphanumerics.contains(scalar),
+                   !flags.contains(.maskCommand) {
+                    DispatchQueue.main.async {
+                        AltTabState.shared.searchText.append(text)
+                    }
                     return nil
                 }
             }
@@ -286,5 +302,15 @@ public final class EventTapManager: @unchecked Sendable {
         } else {
             return nil
         }
+    }
+
+    /// CGEvent → Unicode without an NSEvent; works inside the global tap where local
+    /// monitors never fire (the HUD panel doesn't own key focus).
+    private static func keyboardString(for event: CGEvent) -> String? {
+        var length = 0
+        var chars = [UniChar](repeating: 0, count: 4)
+        event.keyboardGetUnicodeString(maxStringLength: 4, actualStringLength: &length, unicodeString: &chars)
+        guard length > 0 else { return nil }
+        return String(utf16CodeUnits: chars, count: length)
     }
 }

@@ -7,9 +7,55 @@
 
 ## 📌 Proje Özeti & Vizyon
 - **Proje Adı:** WinMac
-- **Sürüm:** v1.3
-- **Son Güncelleme:** 22 Ağustos 2026
-- **Ana Hedef:** macOS için pencere yönetimi, fare denetimi, pencere değiştirici, Windows klavye köprüsü ve pano geçmişini tek bir hafif, yerel Swift uygulamasında birleştirmek.
+- **Sürüm:** v1.5
+- **Son Güncelleme:** 3 Eylül 2026
+- **Ana Hedef:** macOS için pencere yönetimi, pencere değiştirici, Windows klavye köprüsü ve pano geçmişini tek bir hafif, yerel Swift uygulamasında birleştirmek.
+
+---
+
+## 🚀 Sürüm 1.5 — GitHub Öncesi Temizlik (3 Eylül 2026)
+
+Ayrıntılar: [AUDIT.md](AUDIT.md). Özet:
+
+1. **LinearMouse / Fare-Kaydırma modülü tamamen kaldırıldı.** Hiçbir özelliği
+   güvenilir çalışmıyordu ve `ScrollInverter` özel IOHID API'leriyle + kabuktan
+   `defaults write -g com.apple.mouse.scaling` ile kullanıcının sistem fare
+   ayarını sessizce değiştiriyordu. Fare denetimi artık BetterMouse/LinearMouse
+   gibi adanmış araçlara bırakıldı. Silinen: `Sources/MouseScroll/`,
+   `AppSettings` bölüm 3, `EventTapManager` scrollWheel dalı, "Fare ve Kaydırma"
+   ayar paneli + menü öğesi.
+2. **AltTab görünüm modları 4 → 2'ye indirildi** (Büyük Simgeler + Ayrıntılı
+   Liste). `thumbnails` ve `compact` stilleri, `ThumbnailCache.swift`, kullanılmayan
+   `ThumbnailGridView`/`AppIconGridView`/`TitleListView` dosyaları ve
+   `WindowModel.thumbnail` alanı silindi. Ekran Kaydı izni artık hiç gerekmiyor.
+3. **Sürüm tek kaynağa çekildi:** `Info.plist` → `1.4`/`14`; koddaki
+   `"1.2"`/`"1.3"` fallback'leri `"1.4"`.
+4. **Repo hijyeni:** `build/` ve `*.dmg` git takibinden çıkarıldı ve
+   `.gitignore`'a eklendi; `.DS_Store` temizlendi.
+5. **README.md ve LICENSE (MIT) eklendi;** `Info.plist`'e `NSAccessibilityUsageDescription`.
+6. `EventTapManager.startScrollEventTapIfNeeded()` → `startEventTapIfNeeded()`.
+
+---
+
+## 🚀 Sürüm 1.4 — AltTab & LinearMouse Derin Düzeltmeler + Arayüz Yenilemesi (23 Ağustos 2026)
+
+### Pencere Değiştirici Çekirdek Yeniden Yazımı
+1. **Gerçek CGWindowID kimliği:** Yeni `CGWindowResolver.swift` tek seferlik `CGWindowListCopyWindowInfo` anlık görüntüsüyle AX pencerelerini pid+geometri eşlemesinden gerçek WindowServer kimliğine bağlıyor (tolerans <60). Eski sahte `pid<<8|index` ID'si AX sırası değişince değiştiği için thumbnail cache'i zehirleniyor ve MRU imkânsızdı. Kimlik artık kararlı.
+2. **Z-order = MRU sıralaması:** Liste artık CGWindowList katman-0 ön-arka sırasına göre diziliyor; minimize/gizli pencereler sona atılıyor. ⇧Tab gerçek odak geçmişinde geri yürüyor. Eski "frontmost-pid comparator"u gerçekte sort yapmıyordu (rastgele sıra).
+3. **AX eleman yan tablosu:** `WindowEngine.axElementsByID[CGWindowID]` taramada dolduruluyor; odaklama/kapatma/küçültme artık ID ile birebir elemana gidiyor. Title-eşleşmesi kaldırıldı (iki "Untitled" penceresi hep yanlış odaklanıyordu); geometri fallback'i var.
+4. **Subrole filtresi:** Sadece `AXStandardWindow`/`AXDialog` kabul; toolbar/palet/sistem diyaloğu kartları eleniyor. Boyut eşiği 100×50'e yükseltildi (minimize muaf). Placeholder kart yalnızca ön plandaki app için üretiliyor (arka plan daemon spam'i bitti).
+5. **Asenkron thumbnail:** `reloadWindows()` artık capture beklemeden paneli açıyor; `scheduleThumbnailRefresh` arka planda çekip oturum-token'ıyla yayınlıyor. Capture ≤640px'e ölçekleniyor (5K Retina RAM patlaması önlendi).
+6. **Hover deadzone + tek input katmanı:** Panel açılış imleç konumu `hoverOrigin` olarak saklanıyor; 26px içinde hover seçimi ölü (AltTab'in deadzone'u). Local NSEvent monitor tamamen silindi — klavyenin TEK otoritesi global tap: `CGEventKeyboardGetUnicodeString` ile yazarak-ara tap içinde çalışıyor, backspace dahil. Key-repeat wrap bastırma: `keyboardEventAutorepeat` iken seçim uçlara sabitleniyor.
+7. **Panel davranışları:** Seviye `.screenSaver`→`.popUpMenu` (orijinalin bilinçli tercihi; drag&drop bozulması), dışarı tıkla-kapat monitor'ü, HUD içerik-boyutuna shrink-wrap, `canBecomeKey=true` panel alt sınıfı.
+
+### Fare/Kaydırma Pipeline'ı (LinearMouse matematiği)
+8. **Dört kolonlu matris dönüşümü:** `ScrollWheelEventView.transform(matrix:)` integer/fixedPt/pointDelta/**IOHID** kolonlarını birlikte dönüştürüyor; integer delta `sign×max(round(|v|),1)` ile normalize (eski kör çarpan küçük deltaları 0'a truncate edip kaydırmayı yok ediyordu). IOHID erişimi runtime dlsym (`CGEventCopyIOHIDEvent`, field 0x0B0001/2), ilk gerçek event'te makuliyet kontrolü başarısızsa kalıcı devre dışı (güvenli düşüş).
+9. **Pipeline sırası:** invert → speed → Shift-swap (EN SON) + swap sonrası `maskShift` flag'i event'ten siliniyor (tarayıcıda yanlış zoom/geçmiş tetiklenmesi önlendi) + swap koşulu pt/fixedPt alanlarını da görüyor.
+10. **Trackpad ayrımı:** `continuous==1` şartı KALDIRILDI; sadece faz taşıyan olaylar trackpad sayılıyor. Logitech tarzı sürekli-tekerlekli farelerin momentum olayları artık tutarlı işleniyor (karışık yön bug'ı). Sentetik marker `eventSourceUserData=0x534D4F4F5448` loop koruması.
+
+### Arayüz
+11. **Ayarlar yeniden tasarlandı (glassmorphism'siz):** Katmanlı solid kart sistemi — `windowBackgroundColor` üzerinde hairline çizgili `controlBackgroundColor` kartlar, tinted squircle sidebar rozetleri (renk: pane bazlı systemColor gradient'i), uppercase section caption'ları, değer chip'li full-width slider'lar, keycap stilli kısayol satırları. 780×560. Yeni anahtarlar: "Fare ile Seçim" (hoverSelectEnabled), "Masaüstü Kartını Göster", "Gizli Uygulamaları Atla".
+12. **HUD restyle:** accent-color seçim halkası/dolgusu, minimize nokta rozeti, chip tarzı selected-label, stil bazlı shrink-wrap boyutlar, yumuşatılmış gölge/border. `hudWindow` material (Spotlight konvansiyonu) korundu — vibrancy abartısı yok.
 
 ---
 
@@ -68,22 +114,19 @@ hopeful-lovelace/
     ├── main.swift                    # NSApplication.shared başlatıcı
     ├── WinMacApp.swift               # AppDelegate: Status bar, Dock ikonu & Reopen yöneticisi
     ├── Core/
-    │   ├── AppSettings.swift         # UserDefaults destekli @MainActor ayar modeli (6 modül)
+    │   ├── AppSettings.swift         # UserDefaults destekli @MainActor ayar modeli (5 modül)
     │   ├── PermissionsManager.swift  # Accessibility & Screen Recording izin kontrolü
-    │   ├── EventTapManager.swift     # Global Unified CGEventTap (.cgSessionEventTap / .cghidEventTap)
+    │   ├── EventTapManager.swift     # Global Unified CGEventTap — switcher input'unun TEK otoritesi
     │   └── SystemUtils.swift         # Ekran hesaplama, kilit, ekran alıntısı, tuş sentezleme
     ├── SwiftQuit/
     │   └── SwiftQuitEngine.swift     # Son pencere kapandığında uygulamayı sonlandıran motor
     ├── AltTab/
+    │   ├── CGWindowResolver.swift    # Gerçek CGWindowID çözümleme + z-order snapshot (v1.4)
     │   ├── WindowModel.swift         # Pencere veri modeli
-    │   ├── WindowEngine.swift        # Pencere tarama ve odaklama
-    │   ├── ThumbnailCache.swift      # Canlı önizleme önbelleği
-    │   ├── AltTabState.swift         # Switcher klavye gezinme ve filtreleme
-    │   ├── AltTabHUDController.swift # Floating NSPanel pencere yöneticisi
-    │   └── Views/                    # Switcher görünüm modları
-    ├── MouseScroll/
-    │   ├── ScrollInverter.swift      # LinearMouse: Bağımsız tekerlek ayrımı, 1:1 Doğrusal ivme, Shift+Wheel
-    │   └── ScrollWheelEventView.swift # CGEvent kaydırma dönüştürücü
+    │   ├── WindowEngine.swift        # Subrole filtreli tarama, MRU sıralama, ID bazlı odaklama
+    │   ├── AltTabState.swift         # Seçim, deadzone hover, arama filtresi
+    │   ├── AltTabHUDController.swift # popUpMenu seviyeli NSPanel + dışarı-tıkla-kapat
+    │   └── Views/                    # AltTabHUDView (Simgeler + Liste), SearchBarView
     ├── KeyboardBridge/
     │   ├── CtrlToCmdMapper.swift     # Ctrl+C/V/Z/Y/A/S/F/W/T/P/N/R, Backspace, Win tuşları
     │   └── SystemShortcuts.swift     # Sistem kısayolları ve Finder / Task Manager tetikleyicileri
@@ -100,6 +143,6 @@ hopeful-lovelace/
     │   ├── SnapOverlayController.swift # Drag-to-snap şeffaf önizleme paneli
     │   └── WindowCalculation.swift   # Pencere geometri ve gap hesaplama motoru
     └── Settings/
-        ├── SettingsWindowController.swift # Native başlıklı ayar penceresi (720×500, autosave v5)
-        └── SettingsView.swift        # System Settings tarzı NavigationSplitView + grouped Form panelleri
+        ├── SettingsWindowController.swift # Ayar penceresi (780×560)
+        └── SettingsView.swift        # Kart tabanlı modern panel sistemi (solid, vibrancy'siz)
 ```

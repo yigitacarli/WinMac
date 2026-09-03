@@ -25,7 +25,7 @@ public final class PermissionsManager: ObservableObject {
             self.hasAccessibilityPermission = trusted
             if trusted {
                 print("[WinMac] Accessibility permission granted. Starting services.")
-                EventTapManager.shared.startScrollEventTapIfNeeded()
+                EventTapManager.shared.startEventTapIfNeeded()
             } else {
                 print("[WinMac] Accessibility permission revoked. Safely stopping services to prevent UI freeze.")
                 EventTapManager.shared.stop()

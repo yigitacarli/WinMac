@@ -9,7 +9,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
     
     public static var appVersion: String {
         let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
-        return (version?.isEmpty == false) ? version! : "1.2"
+        return (version?.isEmpty == false) ? version! : "1.4"
     }
     
     public func applicationDidFinishLaunching(_ notification: Notification) {
@@ -92,14 +92,6 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         rectItem.target = self
         menu.addItem(rectItem)
         
-        let mouseItem = NSMenuItem(
-            title: "Fare Tekerleğini Ters Çevir: \(AppSettings.shared.invertMouseWheel ? "Açık" : "Kapalı")",
-            action: #selector(toggleMouseScroll),
-            keyEquivalent: ""
-        )
-        mouseItem.target = self
-        menu.addItem(mouseItem)
-        
         let quitItem = NSMenuItem(
             title: "Otomatik Uygulama Çıkışı: \(AppSettings.shared.swiftQuitEnabled ? "Açık" : "Kapalı")",
             action: #selector(toggleSwiftQuit),
@@ -157,11 +149,6 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
     
     @objc private func toggleSnap() {
         AppSettings.shared.snapShortcutsEnabled.toggle()
-        updateStatusMenu()
-    }
-    
-    @objc private func toggleMouseScroll() {
-        AppSettings.shared.invertMouseWheel.toggle()
         updateStatusMenu()
     }
     

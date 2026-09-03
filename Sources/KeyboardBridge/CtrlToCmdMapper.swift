@@ -29,6 +29,8 @@ public final class CtrlToCmdMapper: @unchecked Sendable {
         let isEnabled = defaults.object(forKey: "ctrlToCmdRemapEnabled") as? Bool ?? true
         
         // Check if frontmost app is an excluded terminal or developer environment
+        let flags = event.flags
+        let keyCode = CGKeyCode(event.getIntegerValueField(.keyboardEventKeycode))
         if let frontApp = NSWorkspace.shared.frontmostApplication,
            let bundleId = frontApp.bundleIdentifier {
             let excluded = defaults.stringArray(forKey: "excludedAppsForCtrl") ?? [
@@ -40,12 +42,19 @@ public final class CtrlToCmdMapper: @unchecked Sendable {
                 "io.alacritty"
             ]
             if excluded.contains(bundleId) {
+                // Terminals keep Ctrl+C as SIGINT (process kill); only paste is bridged.
+                if keyCode == 9, // V
+                   flags.contains(.maskControl),
+                   !flags.contains(.maskCommand),
+                   !flags.contains(.maskAlternate) {
+                    var newFlags = flags
+                    newFlags.remove(.maskControl)
+                    newFlags.insert(.maskCommand)
+                    event.flags = newFlags
+                }
                 return event
             }
         }
-        
-        let flags = event.flags
-        let keyCode = CGKeyCode(event.getIntegerValueField(.keyboardEventKeycode))
         
         // 1. Task Manager: Ctrl + Shift + Esc
         if keyCode == 53 && flags.contains(.maskControl) && flags.contains(.maskShift) {

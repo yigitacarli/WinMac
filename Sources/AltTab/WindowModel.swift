@@ -13,8 +13,7 @@ public struct WindowModel: Identifiable, Equatable {
     public let bounds: CGRect
     public var isMinimized: Bool
     public var isHidden: Bool
-    public var thumbnail: NSImage?
-    
+
     public init(
         id: CGWindowID,
         pid: pid_t,
@@ -24,8 +23,7 @@ public struct WindowModel: Identifiable, Equatable {
         title: String,
         bounds: CGRect,
         isMinimized: Bool = false,
-        isHidden: Bool = false,
-        thumbnail: NSImage? = nil
+        isHidden: Bool = false
     ) {
         self.id = id
         self.windowID = id
@@ -37,7 +35,6 @@ public struct WindowModel: Identifiable, Equatable {
         self.bounds = bounds
         self.isMinimized = isMinimized
         self.isHidden = isHidden
-        self.thumbnail = thumbnail
     }
     
     public static func == (lhs: WindowModel, rhs: WindowModel) -> Bool {

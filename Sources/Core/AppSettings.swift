@@ -5,27 +5,21 @@ import CoreGraphics
 import ServiceManagement
 
 public enum SwitcherStyle: String, CaseIterable, Identifiable, Sendable {
-    case thumbnails = "thumbnails"
     case icons = "icons"
-    case compact = "compact"
     case list = "list"
-    
+
     public var id: String { rawValue }
-    
+
     public var title: String {
         switch self {
-        case .thumbnails: return "Pencere Önizlemeleri"
         case .icons: return "Büyük Uygulama Simgeleri"
-        case .compact: return "Kompakt Izgara"
         case .list: return "Ayrıntılı Liste"
         }
     }
-    
+
     public var subtitle: String {
         switch self {
-        case .thumbnails: return "Canlı pencere görselleri"
         case .icons: return "Hızlı simge odaklı geçiş"
-        case .compact: return "Yüksek yoğunluklu kartlar"
         case .list: return "Başlık ve süreç detayları"
         }
     }
@@ -114,36 +108,7 @@ public final class AppSettings: ObservableObject {
         didSet { defaults.set(almostMaximizePadding, forKey: "almostMaximizePadding") }
     }
     
-    // MARK: - 3. LinearMouse (Mouse & Scroll Control)
-    @Published public var disableMouseAcceleration: Bool {
-        didSet {
-            defaults.set(disableMouseAcceleration, forKey: "disableMouseAcceleration")
-            ScrollInverter.shared.updateHardwarePointerProperties(linear: disableMouseAcceleration, sensitivity: mousePointerSensitivity)
-        }
-    }
-    @Published public var mousePointerSensitivity: Double {
-        didSet {
-            defaults.set(mousePointerSensitivity, forKey: "mousePointerSensitivity")
-            ScrollInverter.shared.updateHardwarePointerProperties(linear: disableMouseAcceleration, sensitivity: mousePointerSensitivity)
-        }
-    }
-    @Published public var invertMouseWheel: Bool {
-        didSet { defaults.set(invertMouseWheel, forKey: "invertMouseWheel") }
-    }
-    @Published public var invertHorizontalScroll: Bool {
-        didSet { defaults.set(invertHorizontalScroll, forKey: "invertHorizontalScroll") }
-    }
-    @Published public var scrollSpeedMultiplier: Double {
-        didSet { defaults.set(scrollSpeedMultiplier, forKey: "scrollSpeedMultiplier") }
-    }
-    @Published public var shiftToHorizontalScroll: Bool {
-        didSet { defaults.set(shiftToHorizontalScroll, forKey: "shiftToHorizontalScroll") }
-    }
-    @Published public var cmdToZoom: Bool {
-        didSet { defaults.set(cmdToZoom, forKey: "cmdToZoom") }
-    }
-    
-    // MARK: - 4. SwiftQuit (Auto Termination)
+    // MARK: - 3. SwiftQuit (Auto Termination)
     @Published public var swiftQuitEnabled: Bool {
         didSet { defaults.set(swiftQuitEnabled, forKey: "swiftQuitEnabled") }
     }
@@ -154,7 +119,7 @@ public final class AppSettings: ObservableObject {
         didSet { defaults.set(swiftQuitExcludedApps, forKey: "swiftQuitExcludedApps") }
     }
     
-    // MARK: - 5. AltTab (Window Switcher HUD)
+    // MARK: - 4. AltTab (Window Switcher HUD)
     @Published public var altTabEnabled: Bool {
         didSet { defaults.set(altTabEnabled, forKey: "altTabEnabled") }
     }
@@ -170,6 +135,9 @@ public final class AppSettings: ObservableObject {
     @Published public var searchFilterEnabled: Bool {
         didSet { defaults.set(searchFilterEnabled, forKey: "searchFilterEnabled") }
     }
+    @Published public var hoverSelectEnabled: Bool {
+        didSet { defaults.set(hoverSelectEnabled, forKey: "hoverSelectEnabled") }
+    }
     @Published public var hideHiddenApps: Bool {
         didSet { defaults.set(hideHiddenApps, forKey: "hideHiddenApps") }
     }
@@ -177,7 +145,7 @@ public final class AppSettings: ObservableObject {
         didSet { defaults.set(showDesktopCard, forKey: "showDesktopCard") }
     }
     
-    // MARK: - 6. Windows Shortcuts & Muscle Memory Remapping
+    // MARK: - 5. Windows Shortcuts & Muscle Memory Remapping
     @Published public var ctrlToCmdRemapEnabled: Bool {
         didSet { defaults.set(ctrlToCmdRemapEnabled, forKey: "ctrlToCmdRemapEnabled") }
     }
@@ -203,7 +171,7 @@ public final class AppSettings: ObservableObject {
         didSet { defaults.set(excludedAppsForCtrl, forKey: "excludedAppsForCtrl") }
     }
     
-    // MARK: - 7. Clipboard History (Win+V / Option+V)
+    // MARK: - 6. Clipboard History (Win+V / Option+V)
     @Published public var clipboardHistoryEnabled: Bool {
         didSet { defaults.set(clipboardHistoryEnabled, forKey: "clipboardHistoryEnabled") }
     }
@@ -225,15 +193,6 @@ public final class AppSettings: ObservableObject {
         self.snapWindowGaps = defaults.object(forKey: "snapWindowGaps") as? Double ?? 0.0
         self.almostMaximizePadding = defaults.object(forKey: "almostMaximizePadding") as? Double ?? 24.0
         
-        // LinearMouse
-        self.disableMouseAcceleration = defaults.object(forKey: "disableMouseAcceleration") as? Bool ?? false
-        self.mousePointerSensitivity = defaults.object(forKey: "mousePointerSensitivity") as? Double ?? 1.0
-        self.invertMouseWheel = defaults.object(forKey: "invertMouseWheel") as? Bool ?? false
-        self.invertHorizontalScroll = defaults.object(forKey: "invertHorizontalScroll") as? Bool ?? false
-        self.scrollSpeedMultiplier = defaults.object(forKey: "scrollSpeedMultiplier") as? Double ?? 1.0
-        self.shiftToHorizontalScroll = defaults.object(forKey: "shiftToHorizontalScroll") as? Bool ?? true
-        self.cmdToZoom = defaults.object(forKey: "cmdToZoom") as? Bool ?? true
-        
         // SwiftQuit
         self.swiftQuitEnabled = defaults.object(forKey: "swiftQuitEnabled") as? Bool ?? false
         self.swiftQuitDelaySeconds = defaults.object(forKey: "swiftQuitDelaySeconds") as? Int ?? 2
@@ -254,6 +213,7 @@ public final class AppSettings: ObservableObject {
         let dispStr = defaults.string(forKey: "displayMode") ?? SwitcherDisplayMode.cursorDisplay.rawValue
         self.displayMode = SwitcherDisplayMode(rawValue: dispStr) ?? .cursorDisplay
         self.searchFilterEnabled = defaults.object(forKey: "searchFilterEnabled") as? Bool ?? true
+        self.hoverSelectEnabled = defaults.object(forKey: "hoverSelectEnabled") as? Bool ?? true
         self.hideHiddenApps = defaults.object(forKey: "hideHiddenApps") as? Bool ?? false
         self.showDesktopCard = defaults.object(forKey: "showDesktopCard") as? Bool ?? true
         
@@ -277,8 +237,5 @@ public final class AppSettings: ObservableObject {
         // Clipboard
         self.clipboardHistoryEnabled = defaults.object(forKey: "clipboardHistoryEnabled") as? Bool ?? true
         self.maxClipboardItems = defaults.object(forKey: "maxClipboardItems") as? Int ?? 50
-        
-        // Sync hardware pointer state on startup
-        ScrollInverter.shared.updateHardwarePointerProperties(linear: self.disableMouseAcceleration, sensitivity: self.mousePointerSensitivity)
     }
 }
