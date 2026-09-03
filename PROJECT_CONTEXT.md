@@ -34,6 +34,14 @@
      `NSApp.deactivate()` ile geri alınıyordu).
 4. Dış-tıkla-kapat için ayrı `NSEvent` global monitörü kaldırıldı (artık tam ekran
    karartma katmanı bu işi yapıyor).
+5. **Masaüstü kartı** (`showDesktopCard`, varsayılan açık) yeni tasarımda düzgün
+   görünüyor: `WindowModel.isDesktop` bayrağı; kesikli çerçeveli ayrı görünüm +
+   beyaz `menubar.dock.rectangle` simgesi (eski `desktopcomputer` NSImage koyu
+   kutuda görünmüyordu). Seçilince tüm uygulamaları gizleyip masaüstünü gösterir.
+   Not: switcher'daki başlık satırı gerçek pencere başlığını gösterir (ekran
+   görüntülerindeki "belge 1/2" sadece demo veriydi).
+6. `classicBox` sütun/satır matematiği düzeltildi — `LazyVGrid` bütçelenmemiş satır
+   sarmıyor, son kart (masaüstü) artık kırpılmıyor.
 
 ---
 

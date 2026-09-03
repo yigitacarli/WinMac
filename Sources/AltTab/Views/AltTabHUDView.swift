@@ -84,10 +84,14 @@ public struct AltTabHUDView: View {
 
     private func classicBox(_ windows: [WindowModel], maxWidth: CGFloat, maxHeight: CGFloat) -> some View {
         let pitch = Self.tileSlot + Self.tileGap
-        let perRow = max(1, min(windows.count, Int((maxWidth - Self.boxPad * 2 + Self.tileGap) / pitch)))
+        // Conservative column count (a little slack so LazyVGrid never wraps a row we
+        // didn't budget height for).
+        let availW = maxWidth - Self.boxPad * 2 - 6
+        let perRow = max(1, min(windows.count, Int((availW + Self.tileGap) / pitch)))
         let rows = Int(ceil(Double(windows.count) / Double(perRow)))
-        let boxW = max(300, CGFloat(perRow) * pitch - Self.tileGap + Self.boxPad * 2)
-        let contentH = CGFloat(rows) * Self.tileSlot + CGFloat(max(0, rows - 1)) * Self.tileGap + 4
+        let gridInnerW = CGFloat(perRow) * pitch - Self.tileGap
+        let boxW = max(320, gridInnerW + Self.boxPad * 2)
+        let contentH = CGFloat(rows) * pitch - Self.tileGap + 4
         let gridH = min(contentH, maxHeight)
         let columns = [GridItem(.adaptive(minimum: Self.tileSlot, maximum: Self.tileSlot), spacing: Self.tileGap)]
 
@@ -103,9 +107,8 @@ public struct AltTabHUDView: View {
                                     .onHover { _ in hoverSelect(index) }
                             }
                         }
-                        .padding(2)
                     }
-                    .frame(width: boxW - Self.boxPad * 2, height: gridH)
+                    .frame(width: gridInnerW, height: gridH)
                     .onChange(of: state.selectedIndex) { _, new in
                         withAnimation(.easeOut(duration: 0.12)) { proxy.scrollTo(new, anchor: .center) }
                     }
@@ -127,12 +130,22 @@ public struct AltTabHUDView: View {
     private func iconTile(_ window: WindowModel, selected: Bool) -> some View {
         ZStack {
             RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .fill(selected ? Color.white.opacity(0.16) : Color.clear)
+                .fill(selected ? Color.white.opacity(0.16)
+                      : (window.isDesktop ? Color.white.opacity(0.05) : Color.clear))
             RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .strokeBorder(selected ? Color.accentColor : Color.clear, lineWidth: 2)
+                .strokeBorder(
+                    selected ? Color.accentColor
+                    : (window.isDesktop ? Color.white.opacity(0.18) : Color.clear),
+                    style: StrokeStyle(lineWidth: selected ? 2 : 1,
+                                       dash: window.isDesktop && !selected ? [3, 3] : [])
+                )
 
             Group {
-                if let icon = window.appIcon {
+                if window.isDesktop {
+                    Image(systemName: "menubar.dock.rectangle")
+                        .font(.system(size: 30, weight: .regular))
+                        .foregroundStyle(.white.opacity(0.9))
+                } else if let icon = window.appIcon {
                     Image(nsImage: icon).resizable().aspectRatio(contentMode: .fit)
                 } else {
                     Image(systemName: "app.dashed").font(.system(size: 40)).foregroundStyle(.white.opacity(0.6))
@@ -164,7 +177,7 @@ public struct AltTabHUDView: View {
                     .foregroundStyle(.white)
                     .lineLimit(1)
                     .truncationMode(.middle)
-                if !selected.title.isEmpty && selected.title != selected.appName {
+                if !selected.isDesktop, !selected.title.isEmpty, selected.title != selected.appName {
                     Text(selected.appName)
                         .font(.system(size: 11))
                         .foregroundStyle(.white.opacity(0.55))
@@ -226,7 +239,11 @@ public struct AltTabHUDView: View {
 
     private func listRow(_ window: WindowModel, selected: Bool) -> some View {
         HStack(spacing: 10) {
-            if let icon = window.appIcon {
+            if window.isDesktop {
+                Image(systemName: "menubar.dock.rectangle")
+                    .font(.system(size: 15)).frame(width: 24, height: 24)
+                    .foregroundStyle(.white.opacity(0.9))
+            } else if let icon = window.appIcon {
                 Image(nsImage: icon).resizable().aspectRatio(contentMode: .fit).frame(width: 24, height: 24)
             } else {
                 Image(systemName: "app.dashed").font(.system(size: 18)).frame(width: 24, height: 24)
@@ -235,10 +252,12 @@ public struct AltTabHUDView: View {
                 Text(window.title.isEmpty ? window.appName : window.title)
                     .font(.system(size: 13, weight: selected ? .semibold : .regular))
                     .lineLimit(1)
-                Text(window.appName)
-                    .font(.system(size: 10.5))
-                    .foregroundStyle(.white.opacity(0.5))
-                    .lineLimit(1)
+                if !window.isDesktop {
+                    Text(window.appName)
+                        .font(.system(size: 10.5))
+                        .foregroundStyle(.white.opacity(0.5))
+                        .lineLimit(1)
+                }
             }
             Spacer(minLength: 4)
             if window.isMinimized {

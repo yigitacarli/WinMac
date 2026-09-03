@@ -14,6 +14,9 @@ public struct WindowModel: Identifiable, Equatable {
     public var isMinimized: Bool
     public var isHidden: Bool
 
+    /// The synthetic "show desktop" entry, rendered as an action rather than a window.
+    public var isDesktop: Bool { bundleId == "com.apple.desktop" }
+
     public init(
         id: CGWindowID,
         pid: pid_t,

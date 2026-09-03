@@ -195,12 +195,14 @@ public final class WindowEngine {
     }
 
     private func desktopModel() -> WindowModel {
+        // No icon: the switcher renders this entry with its own white glyph so it reads
+        // as an action ("show the desktop"), not another window.
         WindowModel(
             id: 999_999,
             pid: 0,
             appName: "Masaüstü",
             bundleId: "com.apple.desktop",
-            appIcon: NSImage(systemSymbolName: "desktopcomputer", accessibilityDescription: "Masaüstü"),
+            appIcon: nil,
             title: "Masaüstünü Göster",
             bounds: .zero,
             isMinimized: false,
