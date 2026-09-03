@@ -42,6 +42,23 @@
    görüntülerindeki "belge 1/2" sadece demo veriydi).
 6. `classicBox` sütun/satır matematiği düzeltildi — `LazyVGrid` bütçelenmemiş satır
    sarmıyor, son kart (masaüstü) artık kırpılmıyor.
+7. **AltTab simgeleri büyütüldü** (tile 76→94, ikon 52→66 px).
+
+---
+
+## 🎨 Sürüm 1.7.1 — Yeni Logo + Menü Çubuğu (3 Eylül 2026)
+
+1. **Yeni uygulama ikonu.** `scripts/make_icon.py` (PIL) üretir: Apple squircle
+   ızgarasında, Windows-mavisi degradede 2×2 "Snap Layout" penceresi — sol üst
+   macOS penceresi (trafik ışıkları), diğerleri Windows maximize simgesi.
+   Eski AI-üretimi cam paneller gitti. `Resources/AppIcon_1024.png` + `AppIcon.icns`.
+2. **Özel menü çubuğu simgesi.** `AppDelegate.menuBarIcon()` — ikon motifiyle
+   uyumlu 2×2 pencere ızgarası, `isTemplate` (açık/koyu menü çubuğu). Eski
+   `square.grid.2x2` SF Symbol yerine.
+3. **`showInMenuBar` artık çalışıyor** (eskiden yalnızca defaults yazıyordu).
+   `refreshStatusItemVisibility()` status item'ı ekler/kaldırır; Dock da
+   kapalıysa menü çubuğu simgesi zorla açık kalır (uygulama erişilemez olmasın).
+   Ayarlar → Genel → "Menü Çubuğunda Göster" anahtarı eklendi.
 
 ---
 

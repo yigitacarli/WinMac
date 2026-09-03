@@ -40,6 +40,12 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
                 self?.updateStatusMenu()
             }
             .store(in: &cancellables)
+
+        AppSettings.shared.$showInMenuBar
+            .merge(with: AppSettings.shared.$showInDock)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in self?.refreshStatusItemVisibility() }
+            .store(in: &cancellables)
         
         // Only present settings automatically when accessibility permission is missing
         if !PermissionsManager.shared.hasAccessibilityPermission {
@@ -62,14 +68,54 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     private func setupStatusBar() {
-        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        
-        if let button = statusItem?.button {
-            button.image = NSImage(systemSymbolName: "square.grid.2x2", accessibilityDescription: "WinMac")
-            button.imagePosition = .imageLeft
+        refreshStatusItemVisibility()
+    }
+
+    /// Adds or removes the menu-bar item to match the setting. Never lets the app become
+    /// unreachable — if the Dock icon is also hidden, the menu-bar item stays.
+    func refreshStatusItemVisibility() {
+        let wanted = AppSettings.shared.showInMenuBar || !AppSettings.shared.showInDock
+        if wanted, statusItem == nil {
+            let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+            item.button?.image = Self.menuBarIcon()
+            item.button?.image?.isTemplate = true
+            statusItem = item
+            updateStatusMenu()
+        } else if !wanted, let item = statusItem {
+            NSStatusBar.system.removeStatusItem(item)
+            statusItem = nil
         }
-        
-        updateStatusMenu()
+    }
+
+    /// A 2×2 grid of little windows — the app-icon motif, as a monochrome template.
+    private static func menuBarIcon() -> NSImage {
+        let size = NSSize(width: 17, height: 15)
+        let image = NSImage(size: size, flipped: false) { _ in
+            let gap: CGFloat = 1.5
+            let w = (size.width - gap) / 2
+            let h = (size.height - gap) / 2
+            let radius: CGFloat = 2.2
+            let stroke: CGFloat = 1.5
+            for (col, row) in [(0, 1), (1, 1), (0, 0), (1, 0)] {
+                let cell = NSRect(x: CGFloat(col) * (w + gap),
+                                  y: CGFloat(row) * (h + gap),
+                                  width: w, height: h)
+                let body = NSBezierPath(roundedRect: cell.insetBy(dx: stroke / 2, dy: stroke / 2),
+                                        xRadius: radius, yRadius: radius)
+                body.lineWidth = stroke
+                NSColor.black.setStroke()
+                body.stroke()
+                // filled title bar so each cell reads as a window
+                let bar = NSRect(x: cell.minX, y: cell.maxY - h * 0.30, width: cell.width, height: h * 0.30)
+                let barPath = NSBezierPath(roundedRect: bar.insetBy(dx: stroke / 2, dy: stroke / 2),
+                                           xRadius: radius * 0.6, yRadius: radius * 0.6)
+                NSColor.black.setFill()
+                barPath.fill()
+            }
+            return true
+        }
+        image.isTemplate = true
+        return image
     }
     
     private func updateStatusMenu() {

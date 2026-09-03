@@ -410,12 +410,17 @@ private struct GeneralPane: View {
                 }
             }
 
-            SettingsCard(header: "Başlangıç") {
+            SettingsCard(
+                header: "Başlangıç",
+                footer: "Dock ve menü çubuğu simgelerinin ikisi birden kapatılamaz; en az biri açık kalır."
+            ) {
                 ToggleRow("Girişte Otomatik Başlat", isOn: $settings.launchAtLogin)
                 RowDivider()
                 ToggleRow("Dock'ta Göster",
                           subtitle: "Kapalıysa uygulama yalnızca menü çubuğunda yaşar.",
                           isOn: $settings.showInDock)
+                RowDivider()
+                ToggleRow("Menü Çubuğunda Göster", isOn: $settings.showInMenuBar)
             }
 
             SettingsCard(
