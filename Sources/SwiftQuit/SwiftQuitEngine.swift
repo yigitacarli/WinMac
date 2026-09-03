@@ -79,7 +79,7 @@ public final class SwiftQuitEngine {
             object: nil
         )
         
-        print("[WinMac SwiftQuit] Engine safely active.")
+        print("[WinMac AutoQuit] Engine safely active.")
     }
     
     public func stop() {
@@ -226,7 +226,7 @@ public final class SwiftQuitEngine {
                     return
                 }
                 
-                print("[WinMac SwiftQuit] Auto-terminating closed application: \(name) (\(bundleID))")
+                print("[WinMac AutoQuit] Auto-terminating closed application: \(name) (\(bundleID))")
                 app.terminate()
             }
         }

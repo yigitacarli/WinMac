@@ -133,7 +133,7 @@ public struct WindowCalculation {
                 height: h
             )
             
-        case .nextDisplay, .previousDisplay, .expandSize, .shrinkSize:
+        case .nextDisplay, .previousDisplay:
             return adjustedFrame
         }
     }

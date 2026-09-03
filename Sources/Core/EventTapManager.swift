@@ -118,7 +118,7 @@ public final class EventTapManager: @unchecked Sendable {
             return Unmanaged.passUnretained(event)
         }
         
-        // 1. Mouse Drag & Snap Handling (Rectangle Pro Engine)
+        // 1. Mouse Drag & Snap Handling (window-snap engine)
         if type == .leftMouseDown {
             let loc = NSEvent.mouseLocation
             DispatchQueue.main.async {

@@ -1,0 +1,39 @@
+WinMac
+Copyright (c) 2026 Yigit Acarli
+
+This program is free software: you can redistribute it and/or modify it under
+the terms of the GNU General Public License version 3, as published by the
+Free Software Foundation. See the LICENSE file for the full text.
+
+--------------------------------------------------------------------------------
+Acknowledgements
+--------------------------------------------------------------------------------
+
+WinMac is an independent implementation. Its modules were written from scratch
+against public macOS APIs, but their behaviour is modelled on — and inspired by —
+the following open-source projects. No source code was copied from them.
+
+  * Rectangle            https://github.com/rxhanson/Rectangle          (MIT)
+      Window snapping: keyboard halves/thirds/quarters, drag-to-snap, size cycle.
+
+  * AltTab               https://github.com/lwouis/alt-tab-macos        (GPL-3.0)
+      Window switcher: per-window (not per-app) switching, MRU order, HUD actions.
+
+  * SwiftQuit            https://github.com/onmyway133/SwiftQuit        (GPL-3.0)
+      Auto-quit: terminate an app when its last window is closed.
+
+  * LinearMouse          https://github.com/linearmouse/linearmouse     (MIT)
+      Pointer control: separating acceleration from speed via IOHID service
+      properties, and re-applying them when a device connects or the system wakes.
+      The `Sources/MousePointer/` IOKit SPI shim adapts LinearMouse's PointerKit
+      approach.
+
+Because WinMac's window switcher and auto-quit behaviour are modelled on
+GPL-3.0 projects, WinMac as a whole is distributed under the GPL-3.0.
+
+The Windows-style names used in the UI ("Ctrl → Cmd", "⌥V pano geçmişi", the
+blue snap overlay, etc.) describe Windows conventions and are not affiliated
+with or endorsed by Microsoft.
+
+BetterMouse (https://better-mouse.com) is a separate, closed-source commercial
+application. No BetterMouse code is used in WinMac.

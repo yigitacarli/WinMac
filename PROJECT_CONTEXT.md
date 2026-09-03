@@ -7,9 +7,37 @@
 
 ## 📌 Proje Özeti & Vizyon
 - **Proje Adı:** WinMac
-- **Sürüm:** v1.5
+- **Sürüm:** v1.6
+- **Lisans:** GPL-3.0 (bkz. `LICENSE`, `NOTICE`)
 - **Son Güncelleme:** 3 Eylül 2026
-- **Ana Hedef:** macOS için pencere yönetimi, pencere değiştirici, Windows klavye köprüsü ve pano geçmişini tek bir hafif, yerel Swift uygulamasında birleştirmek.
+- **Ana Hedef:** macOS için pencere yönetimi, pencere değiştirici, fare denetimi, Windows klavye köprüsü ve pano geçmişini tek bir hafif, yerel Swift uygulamasında birleştirmek.
+
+---
+
+## 🚀 Sürüm 1.6 — Lisans, Fare Modülü Dönüşü, Windows Yaslama Rengi (3 Eylül 2026)
+
+1. **Lisans MIT → GPL-3.0.** AltTab ve SwiftQuit üst projeleri GPL-3.0; WinMac'in
+   pencere değiştirici ve otomatik çıkış davranışları bunlardan model alındığı
+   için (kod kopyası yok) bütün proje GPL-3.0 ile dağıtılıyor. `NOTICE` dosyası
+   ilham alınan 4 projeyi ve lisanslarını listeler. README ve commit dili
+   "1:1 port" yerine "davranış model alındı" olarak yumuşatıldı.
+2. **Fare modülü geri döndü — bu kez LinearMouse (MIT) temelli, doğru şekilde.**
+   `Sources/MousePointer/`: C SPI shim (`WinMacC` hedefi) + `PointerDeviceManager`
+   (IOHID cihaz izleme) + apply/restore. İmleç ivmesi + hız + ivme kapatma;
+   cihaz adı / donanım DPI / pil / sorgulama hızı (Hz) gösterimi; uygulama başına
+   devre dışı bırakma listesi. Cihaz eklendiğinde ve `NSWorkspace.didWakeNotification`
+   ile uykudan dönüldüğünde yeniden uygular. Modül kapatılınca sistem
+   varsayılanları geri yüklenir. **Not:** private API'ler; macOS sürümüne göre
+   kırılgan olabilir. Eski `ScrollInverter`'ın hatası tek seferlik uygulama +
+   `defaults write com.apple.mouse.scaling` idi; ikisi de yok.
+3. **Windows tarzı yaslama önizlemesi.** `FootprintWindow` artık gri yerine
+   yarı saydam accent-mavi dolgu (#0078D4 @ 28%) + parlak mavi kenarlık.
+4. **Uygulama içi üçüncü parti isimleri temizlendi** (Ayarlar "Hakkında" metni,
+   `FootprintWindow` başlığı "Rectangle" → "WinMac", log önekleri). Kaynak koddaki
+   davranış-atıf yorumları GPL gereği korundu.
+5. **Yaslama düzeltmeleri:** çalışmayan `⌃⌥=`/`⌃⌥−` büyüt/küçült kısayolları
+   kaldırıldı (WindowCalculation'da maximize'a düşüyordu). Üst/alt yarı için ölü
+   döngü kolları temizlendi — yalnızca sol/sağ yarı 1/2→2/3→1/3 döngüsü yapıyor.
 
 ---
 

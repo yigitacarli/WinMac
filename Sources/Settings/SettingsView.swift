@@ -388,7 +388,7 @@ private struct GeneralPane: View {
     @ObservedObject var permissions: PermissionsManager
 
     private var appVersion: String {
-        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.4"
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.6"
     }
 
     var body: some View {
@@ -413,7 +413,7 @@ private struct GeneralPane: View {
 
             SettingsCard(
                 header: "Hakkında",
-                footer: "WinMac; açık kaynak Rectangle, AltTab ve SwiftQuit projelerinin davranışlarını, Windows klavye alışkanlıkları ve pano geçmişiyle birlikte tek bir yerel uygulamada birleştirir."
+                footer: "WinMac; pencere yaslama, pencere değiştirici, otomatik uygulama çıkışı, Windows klavye alışkanlıkları, fare denetimi ve pano geçmişini tek bir hafif yerel uygulamada birleştirir."
             ) {
                 SettingRow("Sürüm") {
                     Text(appVersion)
@@ -422,7 +422,7 @@ private struct GeneralPane: View {
                 }
                 RowDivider()
                 SettingRow("Modüller") {
-                    Text("Yaslama · Değiştirici · Kısayollar · Pano · Otomatik Çıkış")
+                    Text("Yaslama · Değiştirici · Fare · Kısayollar · Pano · Otomatik Çıkış")
                         .font(.system(size: 12))
                         .foregroundStyle(.secondary)
                 }

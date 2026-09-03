@@ -7,7 +7,7 @@ public final class FootprintWindow: NSWindow {
         let initialRect = NSRect(x: 0, y: 0, width: 0, height: 0)
         super.init(contentRect: initialRect, styleMask: .titled, backing: .buffered, defer: false)
         
-        self.title = "Rectangle"
+        self.title = "WinMac"
         self.isOpaque = false
         self.level = .modalPanel
         self.hasShadow = false
@@ -25,14 +25,15 @@ public final class FootprintWindow: NSWindow {
         self.standardWindowButton(.zoomButton)?.isHidden = true
         self.standardWindowButton(.toolbarButton)?.isHidden = true
         
+        // Windows Snap Assist görünümü: yarı saydam accent-mavi dolgu + parlak mavi kenarlık.
         let boxView = NSBox()
         boxView.boxType = .custom
-        boxView.borderColor = .lightGray
-        boxView.borderWidth = 2.0
-        boxView.cornerRadius = 10.0
+        boxView.borderColor = NSColor(srgbRed: 0.29, green: 0.68, blue: 1.0, alpha: 0.95)
+        boxView.borderWidth = 2.5
+        boxView.cornerRadius = 8.0
         boxView.wantsLayer = true
-        boxView.fillColor = NSColor.black.withAlphaComponent(0.25)
-        
+        boxView.fillColor = NSColor(srgbRed: 0.0, green: 0.47, blue: 0.83, alpha: 0.28)
+
         self.contentView = boxView
     }
     

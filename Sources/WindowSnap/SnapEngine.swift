@@ -21,20 +21,18 @@ public enum SnapAction: Sendable {
     case center
     case nextDisplay
     case previousDisplay
-    case expandSize
-    case shrinkSize
 }
 
 @MainActor
 public final class SnapEngine: @unchecked Sendable {
     public static let shared = SnapEngine()
     
-    // Rectangle Cycle Memory
+    // snap cycle memory
     private var lastAction: SnapAction?
     private var lastActionTime: Date = .distantPast
     private var cycleStep: Int = 0
     
-    // Rectangle Drag-to-Snap State Tracking
+    // drag-to-snap state tracking
     private var currentDragSnapTarget: SnapAction?
     private var isDraggingWindow: Bool = false
     private var trackedWindow: AccessibilityElement?
@@ -42,7 +40,7 @@ public final class SnapEngine: @unchecked Sendable {
     
     private init() {}
     
-    // MARK: - Rectangle Frontmost App & Game Filter
+    // MARK: - frontmost app & game filter
     
     private func isFrontmostAppExcluded() -> Bool {
         guard let frontApp = NSWorkspace.shared.frontmostApplication,
@@ -62,7 +60,7 @@ public final class SnapEngine: @unchecked Sendable {
         return false
     }
     
-    // MARK: - Rectangle 1:1 Drag to Snap Engine
+    // MARK: - drag-to-snap engine
     
     public func handleMouseDown(point: CGPoint) {
         guard !isFrontmostAppExcluded() else {
@@ -223,7 +221,7 @@ public final class SnapEngine: @unchecked Sendable {
         initialWindowOrigin = nil
     }
     
-    // MARK: - Rectangle HotKey Dispatcher
+    // MARK: - hotkey dispatcher
     
     public func handleShortcutAction(_ action: SnapAction) {
         guard !isFrontmostAppExcluded() else { return }
@@ -236,6 +234,8 @@ public final class SnapEngine: @unchecked Sendable {
         var effectiveAction = action
         
         if cycleEnabled && isRecent && lastAction == action {
+            // Repeated left/right-half presses cycle 1/2 -> 2/3 -> 1/3, matching the
+            // familiar Rectangle/Windows PowerToys behaviour. Other actions don't cycle.
             cycleStep = (cycleStep + 1) % 3
             switch action {
             case .leftHalf:
@@ -246,14 +246,8 @@ public final class SnapEngine: @unchecked Sendable {
                 if cycleStep == 1 { effectiveAction = .rightTwoThirds }
                 else if cycleStep == 2 { effectiveAction = .rightThird }
                 else { effectiveAction = .rightHalf }
-            case .topHalf:
-                if cycleStep == 1 { effectiveAction = .maximize }
-                else { effectiveAction = .topHalf }
-            case .bottomHalf:
-                if cycleStep == 1 { effectiveAction = .bottomHalf }
-                else { effectiveAction = .bottomHalf }
             default:
-                break
+                cycleStep = 0
             }
         } else {
             cycleStep = 0

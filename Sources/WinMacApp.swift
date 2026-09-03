@@ -9,7 +9,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
     
     public static var appVersion: String {
         let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
-        return (version?.isEmpty == false) ? version! : "1.4"
+        return (version?.isEmpty == false) ? version! : "1.6"
     }
     
     public func applicationDidFinishLaunching(_ notification: Notification) {

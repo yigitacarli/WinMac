@@ -85,11 +85,7 @@ public final class HotKeyManager: @unchecked Sendable {
         register(id: 14, keyCode: 14, modifiers: optCtrl)
         register(id: 15, keyCode: 17, modifiers: optCtrl)
         
-        // 9. Resize: '=' / '+' (24), '-' (27)
-        register(id: 16, keyCode: 24, modifiers: optCtrl)
-        register(id: 17, keyCode: 27, modifiers: optCtrl)
-        
-        // 10. Multi-Display: Opt+Ctrl+Cmd + Left (123), Right (124)
+        // 9. Multi-Display: Opt+Ctrl+Cmd + Left (123), Right (124)
         register(id: 18, keyCode: 123, modifiers: optCtrlCmd)
         register(id: 19, keyCode: 124, modifiers: optCtrlCmd)
     }
@@ -149,11 +145,6 @@ public final class HotKeyManager: @unchecked Sendable {
             SnapEngine.shared.handleShortcutAction(.leftTwoThirds)
         case 15: // T -> Right 2/3
             SnapEngine.shared.handleShortcutAction(.rightTwoThirds)
-            
-        case 16: // Expand
-            SnapEngine.shared.handleShortcutAction(.expandSize)
-        case 17: // Shrink
-            SnapEngine.shared.handleShortcutAction(.shrinkSize)
             
         case 18: // Multi-display Left
             SnapEngine.shared.moveFocusedWindowToDisplay(direction: -1)
