@@ -78,7 +78,7 @@ public struct AltTabHUDView: View {
 
     // MARK: - Classic Windows box (icon strip + title)
 
-    private static let tileSlot: CGFloat = 76      // grid cell
+    private static let tileSlot: CGFloat = 94      // grid cell
     private static let tileGap: CGFloat = 8
     private static let boxPad: CGFloat = 20
 
@@ -143,24 +143,24 @@ public struct AltTabHUDView: View {
             Group {
                 if window.isDesktop {
                     Image(systemName: "menubar.dock.rectangle")
-                        .font(.system(size: 30, weight: .regular))
+                        .font(.system(size: 40, weight: .regular))
                         .foregroundStyle(.white.opacity(0.9))
                 } else if let icon = window.appIcon {
                     Image(nsImage: icon).resizable().aspectRatio(contentMode: .fit)
                 } else {
-                    Image(systemName: "app.dashed").font(.system(size: 40)).foregroundStyle(.white.opacity(0.6))
+                    Image(systemName: "app.dashed").font(.system(size: 52)).foregroundStyle(.white.opacity(0.6))
                 }
             }
-            .frame(width: 52, height: 52)
+            .frame(width: 66, height: 66)
             .opacity(window.isMinimized || window.isHidden ? 0.45 : 1)
 
             if window.isMinimized || window.isHidden {
                 Image(systemName: "minus")
-                    .font(.system(size: 8, weight: .black))
+                    .font(.system(size: 9, weight: .black))
                     .foregroundStyle(.white)
                     .padding(3)
                     .background(Circle().fill(Color(nsColor: .systemOrange)))
-                    .offset(x: 21, y: -21)
+                    .offset(x: 28, y: -28)
             }
         }
         .frame(width: Self.tileSlot, height: Self.tileSlot)
