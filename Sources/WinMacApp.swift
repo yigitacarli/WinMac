@@ -9,12 +9,12 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
     
     public static var appVersion: String {
         let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
-        return (version?.isEmpty == false) ? version! : "1.6"
+        return (version?.isEmpty == false) ? version! : "1.7"
     }
     
     public func applicationDidFinishLaunching(_ notification: Notification) {
         print("[WinMac] Application launching...")
-        
+
         // Ensure regular Dock application
         NSApp.setActivationPolicy(AppSettings.shared.showInDock ? .regular : .accessory)
         

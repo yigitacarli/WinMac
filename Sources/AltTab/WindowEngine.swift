@@ -25,6 +25,7 @@ public final class WindowEngine {
         let settings = AppSettings.shared
         let snapshot = CGWindowResolver.Snapshot()
         let runningApps = NSWorkspace.shared.runningApplications
+        let frontApp = NSWorkspace.shared.frontmostApplication
 
         for app in runningApps {
             guard app.activationPolicy == .regular,
@@ -39,11 +40,15 @@ public final class WindowEngine {
             let appIcon = app.icon ?? NSWorkspace.shared.icon(forFile: app.bundleURL?.path ?? "")
             let bundleId = app.bundleIdentifier
             let appElement = AXUIElementCreateApplication(pid)
+            // A busy game / hung app can block an AX query for seconds. Cap it hard so one
+            // unresponsive process never freezes the whole switcher.
+            AXUIElementSetMessagingTimeout(appElement, 0.25)
 
             var windowsVal: AnyObject?
             let axResult = AXUIElementCopyAttributeValue(appElement, kAXWindowsAttribute as CFString, &windowsVal)
             let axWindows = axResult == .success ? windowsVal as? [AXUIElement] : nil
 
+            var appModelCount = 0
             if let axWindows, !axWindows.isEmpty {
                 for win in axWindows {
                     guard let model = makeModel(
@@ -57,22 +62,44 @@ public final class WindowEngine {
                     ) else { continue }
                     axElementsByID[model.id] = win
                     result.append(model)
+                    appModelCount += 1
                 }
-            } else if app == NSWorkspace.shared.frontmostApplication {
-                // Windowless placeholder only for the active app; background daemons and
-                // menu-bar helpers would otherwise spam the switcher with dead cards.
-                let model = WindowModel(
-                    id: CGWindowID(UInt32(pid) << 8 | 1),
-                    pid: pid,
-                    appName: appName,
-                    bundleId: bundleId,
-                    appIcon: appIcon,
-                    title: appName,
-                    bounds: .zero,
-                    isMinimized: false,
-                    isHidden: app.isHidden
-                )
-                result.append(model)
+            }
+
+            // Fallback: apps whose Accessibility tree is empty or unreadable — full-screen
+            // games especially — still expose on-screen windows via the WindowServer.
+            if appModelCount == 0 {
+                let cgWindows = snapshot.entries.filter { $0.pid == pid && $0.frame.width > 100 && $0.frame.height > 60 }
+                for entry in cgWindows {
+                    result.append(WindowModel(
+                        id: entry.windowID,
+                        pid: pid,
+                        appName: appName,
+                        bundleId: bundleId,
+                        appIcon: appIcon,
+                        title: appName,
+                        bounds: entry.frame,
+                        isMinimized: false,
+                        isHidden: app.isHidden
+                    ))
+                    appModelCount += 1
+                }
+                // Still nothing, but this app is the active one: a windowless placeholder
+                // keeps it reachable (background daemons never get here).
+                if appModelCount == 0, app == frontApp {
+                    result.append(WindowModel(
+                        id: CGWindowID(UInt32(pid) << 8 | 1),
+                        pid: pid,
+                        appName: appName,
+                        bundleId: bundleId,
+                        appIcon: appIcon,
+                        title: appName,
+                        bounds: .zero,
+                        isMinimized: false,
+                        isHidden: app.isHidden
+                    ))
+                    appModelCount += 1
+                }
             }
         }
 
@@ -201,8 +228,9 @@ public final class WindowEngine {
         // the AX raise below then pins the exact target on top.
         app.activate()
 
+        // Full-screen games etc. have no reachable AX window — activating the app
+        // (done above) is the best we can do; don't undo it.
         guard let element = axElementsByID[window.id] ?? findElementFallback(window) else {
-            NSApp.deactivate()
             return
         }
 
@@ -218,6 +246,7 @@ public final class WindowEngine {
 
     private func findElementFallback(_ window: WindowModel) -> AXUIElement? {
         let appElement = AXUIElementCreateApplication(window.pid)
+        AXUIElementSetMessagingTimeout(appElement, 0.25)
         var windowsVal: AnyObject?
         guard AXUIElementCopyAttributeValue(appElement, kAXWindowsAttribute as CFString, &windowsVal) == .success,
               let axWindows = windowsVal as? [AXUIElement] else { return nil }

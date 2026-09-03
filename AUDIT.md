@@ -18,7 +18,7 @@ swiftquit, linearmouse). WinMac motorları davranışsal yeniden yazım; kod kop
 | Modül | Durum | Not |
 |---|---|---|
 | Pencere Yaslama | ✅ | Kısayol → SnapAction eşlemesi Ayarlar "Kısayol Referansı" ile tutarlı. `⌃⌥=`/`⌃⌥−` büyüt/küçült **çalışmıyordu** (maximize'a düşüyordu) → kaldırıldı. Üst/alt yarı için ölü döngü kolları temizlendi. |
-| Pencere Değiştirici | ✅ | `EventTapManager`'ın çağırdığı tüm `AltTabState` metotları mevcut. 2 stil (Simgeler/Liste) çalışıyor. Thumbnail kodu tamamen silindi. |
+| Pencere Değiştirici | ✅ (v1.7 yeniden tasarım) | Windows 7 klasik kutu görünümü; ekran görüntüsüyle doğrulandı (icons + list). Oyun sağlamlaştırma: assistiveTechHigh panel + orderFrontRegardless + AX timeout + CGWindowList yedeği. **Münhasır tam ekran** oyunlarda hâlâ görünmez — Kenarlıksız mod gerekir. |
 | Otomatik Çıkış | ✅ | SwiftQuit `Swindler`+event tabanlı; WinMac `didDeactivate` + CGWindowList/AX çift doğrulama — bağımsız. Varsayılan **kapalı**. Geniş exclude listesi. |
 | Klavye Kısayolları | ✅ | Terminal/IDE exclude'ları çalışıyor; `SystemShortcuts` + `CtrlToCmdMapper` her ikisinde Win+L mantığı var (çift-işlem riski düşük, ikisi de `return nil`). |
 | Pano Geçmişi | ✅ | 0.5 sn NSPasteboard polling, düz metin. |

@@ -7,10 +7,33 @@
 
 ## 📌 Proje Özeti & Vizyon
 - **Proje Adı:** WinMac
-- **Sürüm:** v1.6
+- **Sürüm:** v1.7
 - **Lisans:** GPL-3.0 (bkz. `LICENSE`, `NOTICE`)
 - **Son Güncelleme:** 3 Eylül 2026
 - **Ana Hedef:** macOS için pencere yönetimi, pencere değiştirici, fare denetimi, Windows klavye köprüsü ve pano geçmişini tek bir hafif, yerel Swift uygulamasında birleştirmek.
+
+---
+
+## 🚀 Sürüm 1.7 — Windows Tarzı AltTab + Oyun Modu Sağlamlaştırma (3 Eylül 2026)
+
+1. **AltTab tamamen yeniden tasarlandı (Windows 7 "klasik kutu").** `AltTabHUDView`
+   sıfırdan yazıldı: tam ekran karartılmış arka plan (dışına tıkla → iptal) + ortada
+   koyu yuvarlak kutu. `.icons` = simge şeridi ızgarası + accent çerçeveli seçim +
+   altta pencere başlığı/uygulama adı; `.list` = koyu kutu içinde dikey liste. Kutular
+   içeriğe göre boyutlanır (greedy ScrollView düzeltildi). Yazarak arama chip'i eklendi.
+2. **Panel artık oyunların üstünde görünüyor.** `AltTabHUDController`: seviye
+   `.popUpMenu` → `assistiveTechHigh`; `orderFrontRegardless()`; panel tam ekran
+   (`screen.frame`). *Münhasır* tam ekran (exclusive) hâlâ imkânsız — oyunu
+   **Kenarlıksız/Pencereli** modda çalıştırmak gerekir (AltTab'ın kendisi de aynı).
+3. **`WindowEngine` sağlamlaştırma:**
+   - Her AX sorgusuna `AXUIElementSetMessagingTimeout(0.25)` — donan/yoğun oyun artık
+     tüm switcher'ı dondurmuyor.
+   - AX boş dönen `.regular` uygulamalar için `CGWindowList` yedeği: tam ekran
+     oyunların penceresi artık listede kart olarak çıkıyor.
+   - `focusWindow`: AX elemanı yoksa `app.activate()` sonucu korunuyor (eskiden
+     `NSApp.deactivate()` ile geri alınıyordu).
+4. Dış-tıkla-kapat için ayrı `NSEvent` global monitörü kaldırıldı (artık tam ekran
+   karartma katmanı bu işi yapıyor).
 
 ---
 

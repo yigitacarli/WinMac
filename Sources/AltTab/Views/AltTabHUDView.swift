@@ -1,5 +1,8 @@
 import SwiftUI
 
+/// Windows-style task switcher: a dimmed full-screen backdrop with a centred dark box.
+/// `.icons` reproduces the classic Windows "hold-Alt" box (icon strip + title line);
+/// `.list` is a vertical detail list for power users.
 public struct AltTabHUDView: View {
     @ObservedObject var state: AltTabState
     @ObservedObject var settings = AppSettings.shared
@@ -9,57 +12,42 @@ public struct AltTabHUDView: View {
     }
 
     public var body: some View {
-        let windows = state.filteredWindows
+        GeometryReader { geo in
+            ZStack {
+                // Windows dims the whole desktop while switching. Tapping it cancels.
+                Color.black.opacity(0.42)
+                    .ignoresSafeArea()
+                    .contentShape(Rectangle())
+                    .onTapGesture { state.cancelSelection() }
 
-        Group {
-            if windows.isEmpty {
-                emptyState
-            } else {
-                switch settings.switcherStyle {
-                case .icons: iconStrip(windows)
-                case .list: listLayout(windows)
+                let windows = state.filteredWindows
+                Group {
+                    if windows.isEmpty {
+                        emptyBox
+                    } else if settings.switcherStyle == .list {
+                        listBox(windows, maxHeight: geo.size.height * 0.7)
+                    } else {
+                        classicBox(windows, maxWidth: geo.size.width * 0.82, maxHeight: geo.size.height * 0.6)
+                    }
                 }
             }
+            .frame(width: geo.size.width, height: geo.size.height)
         }
-        .background(VisualEffectBlur(material: .hudWindow, blendingMode: .behindWindow))
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .strokeBorder(Color.white.opacity(0.12), lineWidth: 1)
-        )
-        .shadow(color: Color.black.opacity(0.28), radius: 22, y: 8)
+        .ignoresSafeArea()
     }
 
-    // MARK: - Empty State
+    // MARK: - Shared chrome
 
-    private var emptyState: some View {
-        VStack(spacing: 8) {
-            Image(systemName: "macwindow")
-                .font(.system(size: 32, weight: .light))
-                .foregroundColor(.secondary)
-            Text("Açık pencere yok")
-                .font(.system(size: 13, weight: .medium))
-                .foregroundColor(.secondary)
-        }
-        .frame(width: 280, height: 110)
-    }
-
-    // MARK: - Shared horizontal strip
-
-    private func strip<Content: View>(@ViewBuilder content: @escaping () -> Content) -> some View {
-        ScrollViewReader { proxy in
-            ScrollView(.horizontal, showsIndicators: false) {
-                content()
-                    .padding(.horizontal, 18)
-                    .padding(.top, 16)
-                    .padding(.bottom, 4)
-            }
-            .onChange(of: state.selectedIndex) { _, newIndex in
-                withAnimation(.spring(response: 0.22, dampingFraction: 0.85)) {
-                    proxy.scrollTo(newIndex, anchor: .center)
-                }
-            }
-        }
+    private func boxBackground<V: View>(_ content: V) -> some View {
+        content
+            .background(VisualEffectBlur(material: .hudWindow, blendingMode: .behindWindow))
+            .background(Color.black.opacity(0.38))
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .strokeBorder(Color.white.opacity(0.14), lineWidth: 1)
+            )
+            .shadow(color: .black.opacity(0.45), radius: 30, y: 12)
     }
 
     private func hoverSelect(_ index: Int) {
@@ -73,177 +61,201 @@ public struct AltTabHUDView: View {
         state.confirmSelection()
     }
 
-    /// Compact caption chip under the strip: app name bold, window title secondary.
+    // MARK: - Empty
+
+    private var emptyBox: some View {
+        boxBackground(
+            VStack(spacing: 8) {
+                Image(systemName: "macwindow")
+                    .font(.system(size: 30, weight: .light))
+                Text("Açık pencere yok")
+                    .font(.system(size: 13, weight: .medium))
+            }
+            .foregroundStyle(.white.opacity(0.7))
+            .frame(width: 280, height: 120)
+        )
+    }
+
+    // MARK: - Classic Windows box (icon strip + title)
+
+    private static let tileSlot: CGFloat = 76      // grid cell
+    private static let tileGap: CGFloat = 8
+    private static let boxPad: CGFloat = 20
+
+    private func classicBox(_ windows: [WindowModel], maxWidth: CGFloat, maxHeight: CGFloat) -> some View {
+        let pitch = Self.tileSlot + Self.tileGap
+        let perRow = max(1, min(windows.count, Int((maxWidth - Self.boxPad * 2 + Self.tileGap) / pitch)))
+        let rows = Int(ceil(Double(windows.count) / Double(perRow)))
+        let boxW = max(300, CGFloat(perRow) * pitch - Self.tileGap + Self.boxPad * 2)
+        let contentH = CGFloat(rows) * Self.tileSlot + CGFloat(max(0, rows - 1)) * Self.tileGap + 4
+        let gridH = min(contentH, maxHeight)
+        let columns = [GridItem(.adaptive(minimum: Self.tileSlot, maximum: Self.tileSlot), spacing: Self.tileGap)]
+
+        return boxBackground(
+            VStack(spacing: 12) {
+                ScrollViewReader { proxy in
+                    ScrollView(.vertical, showsIndicators: false) {
+                        LazyVGrid(columns: columns, spacing: Self.tileGap) {
+                            ForEach(Array(windows.enumerated()), id: \.element.id) { index, window in
+                                iconTile(window, selected: state.selectedIndex == index)
+                                    .id(index)
+                                    .onTapGesture { confirm(index) }
+                                    .onHover { _ in hoverSelect(index) }
+                            }
+                        }
+                        .padding(2)
+                    }
+                    .frame(width: boxW - Self.boxPad * 2, height: gridH)
+                    .onChange(of: state.selectedIndex) { _, new in
+                        withAnimation(.easeOut(duration: 0.12)) { proxy.scrollTo(new, anchor: .center) }
+                    }
+                }
+
+                Divider().overlay(Color.white.opacity(0.12))
+
+                titleLine
+
+                if !state.searchText.isEmpty {
+                    searchChip(count: windows.count)
+                }
+            }
+            .padding(Self.boxPad)
+            .frame(width: boxW)
+        )
+    }
+
+    private func iconTile(_ window: WindowModel, selected: Bool) -> some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(selected ? Color.white.opacity(0.16) : Color.clear)
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .strokeBorder(selected ? Color.accentColor : Color.clear, lineWidth: 2)
+
+            Group {
+                if let icon = window.appIcon {
+                    Image(nsImage: icon).resizable().aspectRatio(contentMode: .fit)
+                } else {
+                    Image(systemName: "app.dashed").font(.system(size: 40)).foregroundStyle(.white.opacity(0.6))
+                }
+            }
+            .frame(width: 52, height: 52)
+            .opacity(window.isMinimized || window.isHidden ? 0.45 : 1)
+
+            if window.isMinimized || window.isHidden {
+                Image(systemName: "minus")
+                    .font(.system(size: 8, weight: .black))
+                    .foregroundStyle(.white)
+                    .padding(3)
+                    .background(Circle().fill(Color(nsColor: .systemOrange)))
+                    .offset(x: 21, y: -21)
+            }
+        }
+        .frame(width: Self.tileSlot, height: Self.tileSlot)
+        .contentShape(Rectangle())
+        .animation(.easeOut(duration: 0.10), value: selected)
+    }
+
     @ViewBuilder
-    private func selectedLabel(_ selected: WindowModel) -> some View {
-        HStack(spacing: 8) {
-            Text(selected.appName)
-                .font(.system(size: 13, weight: .semibold))
-                .lineLimit(1)
-            if !selected.title.isEmpty && selected.title != selected.appName {
-                Text(selected.title)
-                    .font(.system(size: 12))
-                    .foregroundColor(.secondary)
+    private var titleLine: some View {
+        if let selected = state.selectedWindow {
+            VStack(spacing: 2) {
+                Text(selected.title.isEmpty ? selected.appName : selected.title)
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                if !selected.title.isEmpty && selected.title != selected.appName {
+                    Text(selected.appName)
+                        .font(.system(size: 11))
+                        .foregroundStyle(.white.opacity(0.55))
+                        .lineLimit(1)
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .frame(minHeight: 34)
+        } else {
+            Color.clear.frame(height: 34)
+        }
+    }
+
+    private func searchChip(count: Int) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: "magnifyingglass").font(.system(size: 10, weight: .bold))
+            Text(state.searchText).font(.system(size: 11, weight: .medium))
+            Text("· \(count)").font(.system(size: 11)).foregroundStyle(.white.opacity(0.5))
+        }
+        .foregroundStyle(.white.opacity(0.8))
+        .padding(.horizontal, 10)
+        .padding(.vertical, 4)
+        .background(Capsule().fill(Color.white.opacity(0.10)))
+    }
+
+    // MARK: - List box
+
+    private func listBox(_ windows: [WindowModel], maxHeight: CGFloat) -> some View {
+        let rowH: CGFloat = 46
+        let listH = min(CGFloat(windows.count) * rowH + 16, maxHeight)
+        return boxBackground(
+            VStack(spacing: 0) {
+                ScrollViewReader { proxy in
+                    ScrollView(.vertical, showsIndicators: false) {
+                        VStack(spacing: 2) {
+                            ForEach(Array(windows.enumerated()), id: \.element.id) { index, window in
+                                listRow(window, selected: state.selectedIndex == index)
+                                    .id(index)
+                                    .contentShape(Rectangle())
+                                    .onTapGesture { confirm(index) }
+                                    .onHover { _ in hoverSelect(index) }
+                            }
+                        }
+                        .padding(8)
+                    }
+                    .frame(height: listH)
+                    .onChange(of: state.selectedIndex) { _, new in
+                        withAnimation(.easeOut(duration: 0.12)) { proxy.scrollTo(new, anchor: .center) }
+                    }
+                }
+                if !state.searchText.isEmpty {
+                    Divider().overlay(Color.white.opacity(0.12))
+                    searchChip(count: windows.count).padding(8)
+                }
+            }
+            .frame(width: 460)
+        )
+    }
+
+    private func listRow(_ window: WindowModel, selected: Bool) -> some View {
+        HStack(spacing: 10) {
+            if let icon = window.appIcon {
+                Image(nsImage: icon).resizable().aspectRatio(contentMode: .fit).frame(width: 24, height: 24)
+            } else {
+                Image(systemName: "app.dashed").font(.system(size: 18)).frame(width: 24, height: 24)
+            }
+            VStack(alignment: .leading, spacing: 1) {
+                Text(window.title.isEmpty ? window.appName : window.title)
+                    .font(.system(size: 13, weight: selected ? .semibold : .regular))
+                    .lineLimit(1)
+                Text(window.appName)
+                    .font(.system(size: 10.5))
+                    .foregroundStyle(.white.opacity(0.5))
                     .lineLimit(1)
             }
-            if selected.isMinimized || selected.isHidden {
-                Image(systemName: "minus")
-                    .font(.system(size: 9, weight: .bold))
-                    .foregroundStyle(Color(nsColor: .systemOrange))
+            Spacer(minLength: 4)
+            if window.isMinimized {
+                Image(systemName: "minus.circle").font(.system(size: 11)).foregroundStyle(.white.opacity(0.5))
             }
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 6)
+        .foregroundStyle(.white)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 7)
         .background(
-            Capsule(style: .continuous)
-                .fill(Color.white.opacity(0.07))
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(selected ? Color.accentColor.opacity(0.30) : Color.clear)
         )
-        .padding(.bottom, 14)
-    }
-
-    // MARK: - 1. Büyük Simgeler (Command+Tab görünümü)
-
-    private func iconStrip(_ windows: [WindowModel]) -> some View {
-        VStack(spacing: 8) {
-            strip {
-                HStack(spacing: 10) {
-                    ForEach(Array(windows.enumerated()), id: \.element.id) { index, window in
-                        SwitcherCard(
-                            window: window,
-                            isSelected: state.selectedIndex == index,
-                            cardSize: CGSize(width: 86, height: 86),
-                            cornerRadius: 18,
-                            onTap: { confirm(index) },
-                            onHover: { _ in hoverSelect(index) }
-                        ) {
-                            if let icon = window.appIcon {
-                                Image(nsImage: icon)
-                                    .resizable()
-                                    .aspectRatio(contentMode: .fit)
-                                    .frame(width: 58, height: 58)
-                            } else {
-                                Image(systemName: "app.fill")
-                                    .font(.system(size: 44))
-                                    .foregroundStyle(Color.accentColor)
-                            }
-                            badgeDots(window)
-                                .offset(x: 30, y: -30)
-                        }
-                        .id(index)
-                    }
-                }
-            }
-            if let selected = state.selectedWindow {
-                selectedLabel(selected)
-            }
-        }
-        .frame(minWidth: min(CGFloat(max(windows.count, 1)) * 96 + 56, 780))
-    }
-
-    // MARK: - 2. Ayrıntılı Liste
-
-    private func listLayout(_ windows: [WindowModel]) -> some View {
-        ScrollViewReader { proxy in
-            ScrollView(.vertical, showsIndicators: false) {
-                VStack(spacing: 2) {
-                    ForEach(Array(windows.enumerated()), id: \.element.id) { index, window in
-                        HStack(spacing: 10) {
-                            if let icon = window.appIcon {
-                                Image(nsImage: icon)
-                                    .resizable()
-                                    .aspectRatio(contentMode: .fit)
-                                    .frame(width: 22, height: 22)
-                            } else {
-                                Image(systemName: "app.fill")
-                                    .font(.system(size: 17))
-                                    .foregroundStyle(Color.accentColor)
-                                    .frame(width: 22, height: 22)
-                            }
-
-                            VStack(alignment: .leading, spacing: 1) {
-                                Text(window.title)
-                                    .font(.system(size: 12.5, weight: state.selectedIndex == index ? .semibold : .regular))
-                                    .lineLimit(1)
-                                Text(window.appName)
-                                    .font(.system(size: 10.5))
-                                    .foregroundColor(.secondary)
-                                    .lineLimit(1)
-                            }
-
-                            Spacer()
-
-                            if window.isMinimized {
-                                Image(systemName: "minus.circle")
-                                    .font(.system(size: 11))
-                                    .foregroundColor(.secondary)
-                            }
-                        }
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 7)
-                        .background(
-                            RoundedRectangle(cornerRadius: 9, style: .continuous)
-                                .fill(state.selectedIndex == index ? Color.accentColor.opacity(0.24) : Color.clear)
-                        )
-                        .contentShape(Rectangle())
-                        .onTapGesture { confirm(index) }
-                        .onHover { _ in hoverSelect(index) }
-                        .id(index)
-                    }
-                }
-                .padding(10)
-            }
-            .onChange(of: state.selectedIndex) { _, newIndex in
-                withAnimation(.spring(response: 0.22, dampingFraction: 0.85)) {
-                    proxy.scrollTo(newIndex, anchor: .center)
-                }
-            }
-        }
-        .frame(width: 440)
-    }
-
-    @ViewBuilder
-    private func badgeDots(_ window: WindowModel) -> some View {
-        if window.isMinimized || window.isHidden {
-            Circle()
-                .fill(Color(nsColor: .systemOrange))
-                .frame(width: 6, height: 6)
-        }
     }
 }
 
-// MARK: - Switcher Card (strip stilleri için ortak çerçeve)
-
-private struct SwitcherCard<Content: View>: View {
-    let window: WindowModel
-    let isSelected: Bool
-    let cardSize: CGSize
-    var cornerRadius: CGFloat = 14
-    let onTap: () -> Void
-    let onHover: (Bool) -> Void
-    @ViewBuilder let content: () -> Content
-
-    var body: some View {
-        content()
-            .frame(width: cardSize.width, height: cardSize.height)
-            .background(
-                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .fill(isSelected ? Color.accentColor.opacity(0.20) : Color.white.opacity(0.05))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .strokeBorder(
-                        isSelected ? Color.accentColor.opacity(0.85) : Color.white.opacity(0.06),
-                        lineWidth: isSelected ? 2 : 1
-                    )
-            )
-            .scaleEffect(isSelected ? 1.04 : 1.0)
-            .animation(.spring(response: 0.2, dampingFraction: 0.8), value: isSelected)
-            .onTapGesture(perform: onTap)
-            .onHover(perform: onHover)
-    }
-}
-
-// MARK: - Blur Background
+// MARK: - Blur Background (also used by the clipboard HUD)
 
 public struct VisualEffectBlur: NSViewRepresentable {
     var material: NSVisualEffectView.Material

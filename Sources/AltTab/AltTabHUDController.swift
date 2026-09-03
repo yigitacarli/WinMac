@@ -6,7 +6,6 @@ public final class AltTabHUDController {
     public static let shared = AltTabHUDController()
 
     private var panel: NSPanel?
-    private var outsideClickMonitor: Any?
 
     private init() {
         AltTabState.shared.onDismiss = { [weak self] in
@@ -24,29 +23,21 @@ public final class AltTabHUDController {
         AltTabState.shared.beginHoverSession()
         AltTabState.shared.isVisible = true
 
+        // Windows-style: a full-screen dimmed backdrop with the switcher box centred in it.
         let screen = SystemUtils.targetScreen(for: AppSettings.shared.displayMode)
-        let screenFrame = screen.visibleFrame
-
-        // Shrink-wrap the HUD to its content instead of always filling 85% of the screen;
-        // a small strip reads faster and matches the original's compact footprint.
-        let size = preferredSize(forScreen: screenFrame)
-        let originX = screenFrame.midX - (size.width / 2.0)
-        let originY = screenFrame.midY - (size.height / 2.0)
-
-        panel.setFrame(NSRect(origin: NSPoint(x: originX, y: originY), size: size), display: true)
+        panel.setFrame(screen.frame, display: true)
         panel.alphaValue = 0
         panel.makeKeyAndOrderFront(nil)
+        // Force it above full-screen / borderless games and other overlays.
+        panel.orderFrontRegardless()
 
         NSAnimationContext.runAnimationGroup { context in
-            context.duration = 0.12
+            context.duration = 0.11
             panel.animator().alphaValue = 1.0
         }
-
-        startOutsideClickMonitoring()
     }
 
     public func hide(immediately: Bool = false) {
-        stopOutsideClickMonitoring()
         guard let panel = panel, panel.isVisible else { return }
 
         if immediately {
@@ -75,23 +66,9 @@ public final class AltTabHUDController {
         }
     }
 
-    private func preferredSize(forScreen screenFrame: NSRect) -> NSSize {
-        let windows = AltTabState.shared.filteredWindows.count
-        switch AppSettings.shared.switcherStyle {
-        case .icons:
-            let width = min(CGFloat(max(windows, 1)) * 96 + 56, screenFrame.width * 0.85)
-            return NSSize(width: width, height: 176)
-        case .list:
-            return NSSize(
-                width: 440,
-                height: min(CGFloat(windows) * 42 + 36, min(screenFrame.height * 0.7, 420))
-            )
-        }
-    }
-
     private func setupPanel() {
         let p = KeyablePanel(
-            contentRect: NSRect(x: 0, y: 0, width: 700, height: 420),
+            contentRect: NSRect(x: 0, y: 0, width: 1200, height: 800),
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: false
@@ -99,36 +76,16 @@ public final class AltTabHUDController {
 
         p.isOpaque = false
         p.backgroundColor = .clear
-        // .popUpMenu, not .screenSaver: the original explicitly avoids screenSaver level
-        // because it breaks drag & drop and overlays of other top-level utilities.
-        p.level = .popUpMenu
-        p.hasShadow = true
+        p.hasShadow = false
         p.isMovableByWindowBackground = false
-        p.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
+        // Assistive-tech-high sits above the screen-saver level and most game overlays,
+        // so the switcher is visible over borderless / full-screen games (exclusive
+        // full-screen apps still capture the display — no overlay can draw over those).
+        p.level = NSWindow.Level(rawValue: Int(CGWindowLevelForKey(.assistiveTechHighWindow)))
+        p.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]
 
         p.contentView = NSHostingView(rootView: AltTabHUDView(state: AltTabState.shared))
         self.panel = p
-    }
-
-    /// Clicking anywhere outside the HUD dismisses without changing focus — mirrors AltTab's
-    /// hideUi-on-outside-click. Global monitor observes but does not consume the event.
-    private func startOutsideClickMonitoring() {
-        stopOutsideClickMonitoring()
-        outsideClickMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
-            guard let self, let panel = self.panel, panel.isVisible else { return }
-            if !panel.frame.contains(NSEvent.mouseLocation) {
-                Task { @MainActor in
-                    AltTabState.shared.cancelSelection()
-                }
-            }
-        }
-    }
-
-    private func stopOutsideClickMonitoring() {
-        if let monitor = outsideClickMonitor {
-            NSEvent.removeMonitor(monitor)
-            outsideClickMonitor = nil
-        }
     }
 }
 

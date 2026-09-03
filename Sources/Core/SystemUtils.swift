@@ -33,6 +33,7 @@ public struct SystemUtils {
     
     public static func screenForApp(pid: pid_t) -> NSScreen? {
         let appElement = AXUIElementCreateApplication(pid)
+        AXUIElementSetMessagingTimeout(appElement, 0.25)
         var focusedWindow: AnyObject?
         let result = AXUIElementCopyAttributeValue(appElement, kAXFocusedWindowAttribute as CFString, &focusedWindow)
         
