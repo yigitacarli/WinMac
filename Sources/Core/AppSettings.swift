@@ -216,7 +216,14 @@ public final class AppSettings: ObservableObject {
 
     // MARK: - Initializer
     private init() {
-        self.showInDock = defaults.object(forKey: "showInDock") as? Bool ?? true
+        // WinMac is a background utility: it lives in the menu bar, not the Dock, so a
+        // stray Cmd-Q / Dock "Quit" can't take the whole thing down. Installs from before
+        // v1.8 are migrated off the Dock once.
+        if !defaults.bool(forKey: "didMigrateToMenuBarOnly_v18") {
+            defaults.set(false, forKey: "showInDock")
+            defaults.set(true, forKey: "didMigrateToMenuBarOnly_v18")
+        }
+        self.showInDock = defaults.object(forKey: "showInDock") as? Bool ?? false
         self.showInMenuBar = defaults.object(forKey: "showInMenuBar") as? Bool ?? true
         self.launchAtLogin = defaults.object(forKey: "launchAtLogin") as? Bool ?? false
         

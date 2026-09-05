@@ -9,7 +9,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
     
     public static var appVersion: String {
         let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
-        return (version?.isEmpty == false) ? version! : "1.7"
+        return (version?.isEmpty == false) ? version! : "1.8"
     }
     
     public func applicationDidFinishLaunching(_ notification: Notification) {
@@ -60,6 +60,11 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
     public func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         SettingsWindowController.shared.show()
         return true
+    }
+
+    /// Closing the settings window must never quit a background utility.
+    public func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+        false
     }
 
     public func applicationWillTerminate(_ notification: Notification) {

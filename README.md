@@ -45,6 +45,14 @@ Gereksinimler: macOS 14+ ve Xcode komut satırı araçları (`swift` 6).
 listesine WinMac'i ekleyin. Uygulama yalnızca bu izin verilene kadar ayar
 penceresini açar; sonrasında menü çubuğunda yaşar.
 
+### Nasıl kullanılır?
+
+WinMac bir **menü çubuğu uygulamasıdır** — Dock'ta ve ⌘Tab listesinde görünmez,
+arka planda çalışır. Ayarlara menü çubuğu simgesine tıklayıp
+**"WinMac Ayarlarını Aç…"** ile ulaşırsınız; çıkmak için aynı menüdeki
+**"WinMac'ten Çık"**. Dock simgesini istiyorsanız *Ayarlar → Genel → Dock'ta Göster*
+ile açabilirsiniz.
+
 ---
 
 ## Derleme Notları

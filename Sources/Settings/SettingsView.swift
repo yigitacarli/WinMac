@@ -395,7 +395,7 @@ private struct GeneralPane: View {
     @ObservedObject var permissions: PermissionsManager
 
     private var appVersion: String {
-        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.7"
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.8"
     }
 
     var body: some View {
@@ -412,12 +412,12 @@ private struct GeneralPane: View {
 
             SettingsCard(
                 header: "Başlangıç",
-                footer: "Dock ve menü çubuğu simgelerinin ikisi birden kapatılamaz; en az biri açık kalır."
+                footer: "WinMac arka planda çalışan bir yardımcı uygulamadır: normalde Dock'ta görünmez, menü çubuğunda yaşar. Çıkmak için menü çubuğu menüsündeki \"WinMac'ten Çık\" kullanılır. Dock ve menü çubuğu simgeleri aynı anda kapatılamaz."
             ) {
                 ToggleRow("Girişte Otomatik Başlat", isOn: $settings.launchAtLogin)
                 RowDivider()
                 ToggleRow("Dock'ta Göster",
-                          subtitle: "Kapalıysa uygulama yalnızca menü çubuğunda yaşar.",
+                          subtitle: "Kapalıyken uygulama Dock'ta ve ⌘Tab listesinde görünmez.",
                           isOn: $settings.showInDock)
                 RowDivider()
                 ToggleRow("Menü Çubuğunda Göster", isOn: $settings.showInMenuBar)

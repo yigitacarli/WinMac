@@ -7,10 +7,30 @@
 
 ## 📌 Proje Özeti & Vizyon
 - **Proje Adı:** WinMac
-- **Sürüm:** v1.7
+- **Sürüm:** v1.8
 - **Lisans:** GPL-3.0 (bkz. `LICENSE`, `NOTICE`)
-- **Son Güncelleme:** 3 Eylül 2026
+- **Son Güncelleme:** 5 Eylül 2026
 - **Ana Hedef:** macOS için pencere yönetimi, pencere değiştirici, fare denetimi, Windows klavye köprüsü ve pano geçmişini tek bir hafif, yerel Swift uygulamasında birleştirmek.
+
+---
+
+## 🔻 Sürüm 1.8 — Menü Çubuğu Uygulaması (Dock'tan Çıkarıldı) (5 Eylül 2026)
+
+**Sorun:** WinMac Dock'ta normal bir uygulama gibi duruyordu; Dock'tan "Çık"
+denince (ya da ⌘Q ile) tüm arka plan servisleri kapanıyor, menü çubuğu simgesi
+de kayboluyordu. Diğer yardımcı uygulamalar gibi arka planda kalması gerekiyor.
+
+1. **`Info.plist` → `LSUIElement = true`.** Uygulama artık bir menü çubuğu
+   ajanı olarak açılıyor: Dock'ta ve ⌘Tab listesinde görünmüyor.
+2. **`main.swift`** başlangıç politikası `.regular` → `.accessory`. Kullanıcı
+   "Dock'ta Göster"i açarsa `AppDelegate` çalışma anında `.regular`a yükseltir.
+3. **`showInDock` varsayılanı `false`** + tek seferlik geçiş
+   (`didMigrateToMenuBarOnly_v18`) — v1.8 öncesi kurulumlar bir kez Dock'tan
+   çıkarılır.
+4. **`applicationShouldTerminateAfterLastWindowClosed` → `false`.** Ayarlar
+   penceresini kapatmak uygulamayı sonlandırmaz.
+5. Çıkış yolu: menü çubuğu menüsü → "WinMac'ten Çık". Ayarlar → Genel'deki
+   açıklama metni bu davranışı anlatacak şekilde güncellendi.
 
 ---
 
